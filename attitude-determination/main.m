@@ -5,7 +5,7 @@ close all
 
 format longG
 
-addpath(genpath('./SCT/SCTAcademic'));
+addpath(genpath('../SCT/SCTAcademic'));
 
 %% mission parameters
 
