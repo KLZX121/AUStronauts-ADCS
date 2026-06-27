@@ -1,14 +1,16 @@
 function A = TRIAD(b, r)
-% Implement the TRIAD attitude determination algorithm
-% Transforms reference -> body
-% (src - Wertz 1978)
+%TRIAD Implement the TRIAD attitude determination algorithm
+%   A = TRIAD(b, r)
 %
-% Inputs
-% b (3,2) = [b1, b2] body frame unit vectors (sensor measurements)
-% r (3,2) = [r1, r2] reference frame unit vectors
+%   Transforms reference -> body
+%   (src - Wertz 1978)
 %
-% Output
-% A     (3, 3) Attitude DCM
+%   Inputs
+%   b (3,2) = [b1, b2] body frame unit vectors (sensor measurements)
+%   r (3,2) = [r1, r2] reference frame unit vectors
+%
+%   Outputs
+%   A     (3, 3) Attitude DCM
 
 b1 = b(:, 1);
 b2 = b(:, 2);

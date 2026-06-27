@@ -30,7 +30,10 @@ q_sat = QLVLH(r_sat, v_sat);
 x = [r_sat; v_sat; q_sat];
 
 
-% visualise orbit path and locations
+% visualise orbit path and positions
+% TODO: visualise multiple positions
+% TODO: visualise ref/body frames
+% TODO: visualise reference/body vectors
 PltOrbit(el, jD0);
 hold on
 plot3(r_sat(1), r_sat(2), r_sat(3), 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
@@ -67,17 +70,14 @@ uS_meas = CSSModel(x, uS_ref);
 
 % TODO: investigate choice of first vector (see Wertz pg 425 and footnote)
 
-A_TRIAD = TRIAD([uS_meas, uB_meas], [uS_ref, uB_ref]);
-q_TRIAD = Mat2Q(A_TRIAD);
+A_TRIAD_s = TRIAD([uS_meas, uB_meas], [uS_ref, uB_ref]);
+q_TRIAD_s = Mat2Q(A_TRIAD_s);
+
+A_TRIAD_b = TRIAD([uB_meas, uS_meas], [uB_ref, uS_ref]);
+q_TRIAD_b = Mat2Q(A_TRIAD_b);
 
 %% Attitude error
 
-q_err = QMult(q_sat, quatinv(q_TRIAD')')
+[theta_err_s, q_err_s] = QAttErr(q_sat, q_TRIAD_s)
 
-% renormalise
-q_err = q_err/norm(q_err);
-
-% theta
-theta_err = 2*acos(q_err(1))
-% in deg
-rad2deg(theta_err)
+[theta_err_b, q_err_b] = QAttErr(q_sat, q_TRIAD_b)

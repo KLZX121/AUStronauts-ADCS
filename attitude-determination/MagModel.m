@@ -16,6 +16,7 @@ function uB = MagModel(x, jD0)
 % set data structure
 d_mag = MeasMagnetometerEarth;
 d_mag.jD = jD0;
+% d_mag.quantization = 1e-20;
 % default values:
 % d.kR - indices of ECI position vector in state vector (1:3)
 % d.kQ - indices of attitude quaternion in state vector (7:10)
