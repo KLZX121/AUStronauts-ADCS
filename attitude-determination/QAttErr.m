@@ -13,7 +13,7 @@ function [theta_err, q_err] = QAttErr(q_true, q_est)
 %   theta_err       Pointing error (rad)
 %   q_err   (4, 1)  Error quaternion
 
-q_err = QMult(q_true, quatinv(q_est')');
+q_err = QMult(q_true, QPose(q_est));
 
 % renormalise
 q_err = q_err/norm(q_err);
