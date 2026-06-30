@@ -5,4 +5,6 @@ close all;
 
 format longG
 
-addpath(genpath('../SCT/SCTAcademic'));
+if isempty(which('Q2Mat'))
+    addpath(genpath('../SCT/SCTAcademic'));
+end
