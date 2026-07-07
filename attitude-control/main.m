@@ -8,6 +8,9 @@ format longG
 if isempty(which('Q2Mat'))
     addpath(genpath('../SCT/SCTAcademic'));
 end
+if isempty(which('PropState'))
+    addpath(genpath('../common'));
+end
 
 %% initial state
 % angular velocities
@@ -41,24 +44,15 @@ xDotFn = @(x, t, d) [
 ];
 
 
-%% propogate with integrator (RK4)
+%% propagate with integrator (RK4)
 % TODO: compare RK4 with ode45 or other integrators
 % TODO: write own RK4 to better suit the structure of our code
 h = 0.001;
 t0 = 0;
 tf = 1;
-
 t = t0:h:tf;
-N = (tf-t0)/h;
 
-xList = zeros(N+1, size(x0, 1));
-xList(1, :) = x0';
-
-x = x0;
-for i = 1:N
-    x = RK4(xDotFn, x, h, t(i), d);
-    xList(i+1, :) = x';
-end
+[x, xList] = PropState(xDotFn, x0, d, h, t);
 
 %out = RK4Convergence(x0, xDotFn, d, 15);
 
@@ -108,4 +102,4 @@ ylabel('euler axis')
 grid on
 legend('x', 'y', 'z')
 
-AnimQ(qBL)
+%AnimQ(qBL);
