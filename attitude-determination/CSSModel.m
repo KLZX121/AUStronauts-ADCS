@@ -1,10 +1,10 @@
-function uS = CSSModel(x, uS_ref)
+function uS = CSSModel(x, uSRef)
 %CSSModel Coarse Sun Sensor Model
 %   uS = CSSModel(x, uS_ref)
 %   
 %   Inputs
 %   x       (:, 1)  state vector
-%   uS_ref  (3, 1)  reference unit sun vector (reference frame)
+%   uSRef  (3, 1)  reference unit sun vector (reference frame)
 %   
 %   Outputs
 %   uS      (3, 1)  measured unit sun vector (body frame)
@@ -15,19 +15,19 @@ function uS = CSSModel(x, uS_ref)
 %   TODO: rewrite function for orbital parameters
 
 % set data structure
-d_sun = MeasSunSensorAnalog;
+dSun = MeasSunSensorAnalog;
 % sensor unit vectors (6 sensors)
-d_sun.u = [1  -1  0  0  0  0;
+dSun.u = [1  -1  0  0  0  0;
            0   0  1 -1  0  0;
            0   0  0  0  1 -1];
 % sensor coefficients
 % m(1,1) + m(1,2)*cos(theta) + ... + m(1,n)*cos(theta)^(n-1)
 % set to pure cosine response
-d_sun.m = repmat([0 1], [6, 1]);
+dSun.m = repmat([0 1], [6, 1]);
 % sun reference vector
-d_sun.uSunECI = uS_ref;
+dSun.uSunECI = uSRef;
 % gaussian noise level (none)
-d_sun.noise = zeros(1, 6);
+dSun.noise = zeros(1, 6);
 % default values:
 % d.kQ - indices of quaternion in state vector (7:10)
 
@@ -44,10 +44,10 @@ d_sun.noise = zeros(1, 6);
 % c = cos(uSunBody'*d.u(:,k));
 % to
 % c = uSunBody'*d.u(:,k);
-y_sun = MeasSunSensorAnalog(x, d_sun);
+ySun = MeasSunSensorAnalog(x, dSun);
 % trim negative values
-y_sun = max(0, y_sun);
+ySun = max(0, ySun);
 % compute sun vector
-uS = d_sun.u*y_sun;
+uS = dSun.u*ySun;
 
 end

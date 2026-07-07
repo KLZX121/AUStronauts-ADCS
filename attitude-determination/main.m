@@ -20,16 +20,16 @@ end
 [el, jD0] = ISSOrbit('fixed');
 
 % get current pos + vel at orbital elements (ECI)
-[r_sat, v_sat] = El2RV(el); % [km, km/s]
+[r0, v0] = El2RV(el); % [km, km/s]
 
 % initialise attitude quaternion to LVLH (ECI -> LVLH)
 % note: SCT puts scalar at q1
-q_sat = QLVLH(r_sat, v_sat);
+q0 = QLVLH(r0, v0);
 
 
 % state vector
 % x = [rx; ry; rz; vx; vy; vz; q1; q2; q3; q4]
-x = [r_sat; v_sat; q_sat];
+x = [r0; v0; q0];
 
 
 % visualise orbit path and positions
@@ -38,7 +38,7 @@ x = [r_sat; v_sat; q_sat];
 % TODO: visualise reference/body vectors
 PltOrbit(el, jD0);
 hold on
-plot3(r_sat(1), r_sat(2), r_sat(3), 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
+plot3(r0(1), r0(2), r0(3), 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
 hold off
 
 %% reference vectors (ECI)
@@ -46,17 +46,17 @@ hold off
 % magnetic field reference vector
 % use dipole for initial model
 % TODO: improve with IGRF model
-[b_ref, bDot_ref] = BDipole(r_sat, jD0, v_sat); % [T, T/s]
+[bRef, bDotRef] = BDipole(r0, jD0, v0); % [T, T/s]
 
 % convert magnetic reference vec to unit vector
-uB_ref = b_ref./norm(b_ref);
+uBRef = bRef./norm(bRef);
 
 
 % sun reference vector
 % TODO: improve with SunV2 and compare with SunVectorECI
 % u         (3,:)   Unit sun vector (vector TO the sun)
 % r         (1,:)   Distance from origin to sun (km)
-[uS_ref, rS_ref] = SunV1(jD0, r_sat);
+[uSRef, rSRef] = SunV1(jD0, r0);
 
 % hold on
 % arrow3(r_sat', (r_sat+uSun_ref)', 'y0.1')
@@ -64,22 +64,18 @@ uB_ref = b_ref./norm(b_ref);
 
 %% sensor models (body frame)
 
-uB_meas = MagModel(x, jD0);
-
-uS_meas = CSSModel(x, uS_ref);
+uBMeas = MagModel(x, jD0);
+uSMeas = CSSModel(x, uSRef);
 
 %% TRIAD 
 
 % TODO: investigate choice of first vector (see Wertz pg 425 and footnote)
 
-A_TRIAD_s = TRIAD([uS_meas, uB_meas], [uS_ref, uB_ref]);
-q_TRIAD_s = Mat2Q(A_TRIAD_s);
-
-A_TRIAD_b = TRIAD([uB_meas, uS_meas], [uB_ref, uS_ref]);
-q_TRIAD_b = Mat2Q(A_TRIAD_b);
+ATRIAD = TRIAD([uSMeas, uBMeas], [uSRef, uBRef]);
+qTRIAD = Mat2Q(ATRIAD);
 
 %% Attitude error
 
-[theta_err_s, q_err_s] = QAttErr(q_sat, q_TRIAD_s)
+[thetaErr, qErr] = QAttErr(q0, qTRIAD)
 
-[theta_err_b, q_err_b] = QAttErr(q_sat, q_TRIAD_b)
+Anim2Q([q0; qTRIAD])
