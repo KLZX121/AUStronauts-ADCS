@@ -1,6 +1,6 @@
 function [omegaMeas, dOut] = GyroModel(omegaTrue, dt)
 %GyroModel  Models a 3-axis rate gyro
-%   [omegaMeas, d] = GyroModel(d, omegaTrue, dt)
+%   [omegaMeas, dOut] = GyroModel(omegaTrue, dt)
 %
 %   Inputs 
 %   omegaTrue   (3, 1)  True angular velocity (rad/s)
