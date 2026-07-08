@@ -27,7 +27,7 @@ q0 = QLVLH(rSat, vSat);
 d.I = InertiaCubeSat('3U', 6);
 d.iQ = 1:4;
 d.iOmega = 5:7;
-d.T = [1 1 1]';
+d.T = [0.2 0.2 0.1]';
 
 % state vector
 % TODO: properly define a state vector
@@ -61,29 +61,30 @@ figure('Name', 'State Variables');
 tiledlayout(2, 1)
 
 nexttile
-plot(t, xList(:, d.iQ))
+plot(t, xList(d.iQ, :))
 legend("qs", 'q2', 'q3', 'q4')
 grid on
 ylabel('q')
 
 nexttile
-plot(t, xList(:, d.iOmega))
+plot(t, xList(d.iOmega, :))
 legend('wx', 'wy', 'wz')
 grid on
 ylabel('\omega (rad/s)')
 xlabel('t (s)')
 
-%% analyse attitude with euler axis/angle
+%% attitude change plots
+% euler axis/angle
 % convert attitude quaternion into reference with initial quaternion
 % TODO: QMult's syntax is contradictory - write our own function
-qBL = QMult(xList(:, d.iQ)', QPose(q0));
-qs = qBL(1, :)';
-qv = qBL(2:4, :)';
+qBL = QMult(xList(d.iQ, :), QPose(q0));
+qs = qBL(1, :);
+qv = qBL(2:4, :);
 eulAngle = 2*acos(qs);
-eulAxis = qv./vecnorm(qv, 2, 2);
+eulAxis = qv./vecnorm(qv, 2, 1);
 
 figure('Name', 'Attitude (LVLH -> body)');
-tiledlayout(3, 1)
+tiledlayout(4, 1)
 
 nexttile
 plot(t, qBL)
@@ -101,5 +102,23 @@ plot(t, eulAxis)
 ylabel('euler axis')
 grid on
 legend('x', 'y', 'z')
+ylim('padded')
 
-%AnimQ(qBL);
+% euler angles (3-2-1)
+
+n = size(qBL, 2);
+
+eulAngles = zeros(3, n);
+for i = 1:n
+    eulAngles(:, i) = Q2Eul(qBL(:, i));
+end
+
+nexttile
+plot(t, rad2deg(eulAngles))
+grid on
+legend('x', 'y', 'z')
+ylabel('euler angles (deg)')
+xlabel('t (s)')
+
+
+AnimQ(qBL);

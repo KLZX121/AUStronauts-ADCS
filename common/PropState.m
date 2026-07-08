@@ -11,17 +11,17 @@ function [x, xList] = PropState(xDot, x0, d, h, t)
 %   
 %   Outputs
 %   x       (n, 1)      Final state vector
-%   xList   (:, n)      List of state vectors at each timestep
+%   xList   (n, :)      List of state vectors at each timestep
 
 N = (t(end)-t(1))/h;
 
-xList = zeros(N+1, size(x0, 1));
-xList(1, :) = x0';
+xList = zeros(size(x0, 1), N+1);
+xList(:, 1) = x0;
 
 x = x0;
 for i = 1:N
     x = RK4(xDot, x, h, t(i), d);
-    xList(i+1, :) = x';
+    xList(:, i+1) = x;
 end
 
 end
