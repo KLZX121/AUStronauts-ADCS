@@ -12,9 +12,12 @@ if isempty(which('PropState'))
     addpath(genpath('../common'));
 end
 
-%% initial state
+%% initial states
+
 % angular velocities
-omega0 = [0; 0; 0;]; % (rad/s)
+wSat0 = [0; 0; 0;]; % (rad/s)
+wRW0 = [0; 0; 0;];  % (rad/s)
+
 % attitude quaternion
 [el, jD0] = ISSOrbit('fixed');
 [rSat, vSat] = El2RV(el); % [km, km/s]
@@ -22,25 +25,32 @@ q0 = QLVLH(rSat, vSat);
 
 %% plant
 
+% data struct
 % TODO: wrap values somewhere else (another file?)
 % TODO: define body frame (sct has z-axis longitudinal)
-d.I = InertiaCubeSat('3U', 6);
+d.ISat = InertiaCubeSat('3U', 6);   % satellite moi
+d.TExt = [0.2 0.2 0.1]';            % external torques
+d.IRW = 0;                          % rw moi
+d.TRW = [0; 0; 0;];                 % rw torques
+% indices of states in state vetor
 d.iQ = 1:4;
-d.iOmega = 5:7;
-d.T = [0.2 0.2 0.1]';
+d.iWSat = 5:7;
+d.iWRW = 8:10;
 
 % state vector
 % TODO: properly define a state vector
 x0 = [
     q0;
-    omega0;
+    wSat0;
+    wRW0;
 ];
 
 % ode state vector functions
 % TODO: better define our data structure and integrate it less messily
 xDotFn = @(x, t, d) [
-    QKinematics(x(d.iQ), x(d.iOmega)); 
-    EulerDynamics(x(d.iOmega), d);
+    QKinematics(x, d); 
+    EulerDynamics(x, d);
+    [0; 0; 0;]
 ];
 
 
@@ -67,7 +77,7 @@ grid on
 ylabel('q')
 
 nexttile
-plot(t, xList(d.iOmega, :))
+plot(t, xList(d.iWSat, :))
 legend('wx', 'wy', 'wz')
 grid on
 ylabel('\omega (rad/s)')

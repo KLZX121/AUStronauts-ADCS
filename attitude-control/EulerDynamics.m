@@ -1,50 +1,28 @@
-function omegaDot = EulerDynamics(omega, d, w)
+function wSatDot = EulerDynamics(x, d)
 %EulerDynamics Euler Rigid Body Dynamics Equation
-%   omegaDot = EulerDynamics(omega, d, w)
+%   wSatDot = EulerDynamics(wSat, wRW, d)
 %   
 %   INPUT
-%   omega           (3, 1)  Angular velocity of reaction wheels (rad/s) 
-%   d               Input parameters (struct)
-%           .T      (3, 1)  Total external applied torque (N m)
-%           .TRWA   (3, 1)  Total reaction wheel torque (N m)
-%           .I      (3, 3)  Moment of Inertia tensor of satellite (kg m^2)
-%           .IRWA   (3, 3)  Moment of Inertia of Reaction Wheels (kg m^2)
-%
-%   w               (3, 1)  Angular velocity of satellite (rad/s)
+%   x               (:, 1)  State vector
+%   d                       Input parameters (struct)
+%           .TExt   (3, 1)  Total external applied torque (N m)
+%           .TRW    (3, 1)  Total reaction wheel torque (N m)
+%           .ISat   (3, 3)  Moment of Inertia tensor of satellite (kg m^2)
+%           .IRW    (1, 1)  Moment of Inertia of Reaction Wheels (kg m^2)
+%           .iWSat  (1, 3)  Indices of satellite ang vel in state vector
+%           .iWRW   (1, 3)  Indices of rw ang vel in state vector
 %   
 %   OUTPUT
-%   omegaDot        (3, 1)  Angular velocity ODE (rad/s)
+%   wSatDot         (3, 1)  Angular velocity ODE (rad/s)
 %   
-%   TODO: account for time varying I (subsystem deployment) - update euler
-%         equation
+%   TODO: account for time varying I (subsystem deployment)
 
-c    = omega; % current reaction wheel rates (rad/s^2)
-hT   = d.I*w + d.IRWA*c; % find change in momentum (kg m^2/s^2)
-omegaDot = d.I\(d.T - d.TRWA - cross(w, hT)); % satellite angular velocity (rad/s^2)
+% state variables
+wSat = x(d.iWSat);  % (3, 1) angular velocity of satellite (rad/s)
+wRW = x(d.iWRW);     % (3, 1) angular velocity of reaction wheels (rad/s)
+
+% ode
+hT      = d.ISat*wSat + d.IRW*wRW; % total angular momentum (kg m^2/s^2)
+wSatDot = d.ISat \ (d.TExt - d.TRW - cross(wSat, hT));
 
 end
-
-
-
-
-%{
-old function
-
-function omegaDot = EulerDynamics(omega, d)
-%EulerDynamics Euler Rigid Body Dynamics Equation
-%   omegaDot = EulerDynamics(omega, d)
-%   
-%   Inputs
-%   omega   (3, 1)  Angular velocity (rad/s)
-%   d               Input parameters (struct)
-%           .T      (3, 1)  Total applied torque (N m)
-%           .I      (3, 3)  Moment of Inertia tensor (kg m^2)
-%   
-%   Outputs
-%   omegaDot    (3, 1)  Angular velocity ODE (rad/s)
-
-omegaDot = d.I \ (d.T - cross(omega, d.I*omega));
-
-end
-
-%}
