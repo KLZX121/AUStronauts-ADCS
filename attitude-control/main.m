@@ -29,9 +29,10 @@ q0 = QLVLH(rSat, vSat);
 % TODO: wrap values somewhere else (another file?)
 % TODO: define body frame (sct has z-axis longitudinal)
 d.ISat = InertiaCubeSat('3U', 6);   % satellite moi
-d.TExt = [0.2 0.2 0.1]';            % external torques
-d.IRW = 0;                          % rw moi
-d.TRW = [0; 0; 0;];                 % rw torques
+d.TExt = [0 0 0]';            % external torques
+
+d.IRW = (0.6e-3)/(5600*2*pi/60);    % rw moi
+d.TRW = [0.2e-3; 0.2e-3; 0.2e-3;];                 % rw torques
 % indices of states in state vetor
 d.iQ = 1:4;
 d.iWSat = 5:7;
@@ -50,16 +51,16 @@ x0 = [
 xDotFn = @(x, t, d) [
     QKinematics(x, d); 
     EulerDynamics(x, d);
-    [0; 0; 0;]
+    RWDynamics(EulerDynamics(x, d), d);
 ];
 
 
 %% propagate with integrator (RK4)
 % TODO: compare RK4 with ode45 or other integrators
 % TODO: write own RK4 to better suit the structure of our code
-h = 0.001;
+h = 0.1;
 t0 = 0;
-tf = 1;
+tf = 60;
 t = t0:h:tf;
 
 [x, xList] = PropState(xDotFn, x0, d, h, t);
