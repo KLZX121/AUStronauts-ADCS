@@ -1,4 +1,5 @@
-%function T = ReactionWheelTorque(q_desired, q_current)
+
+% function T = ReactionWheelTorque(q_d, q_c)
 
 %% Program Summary
 
@@ -17,11 +18,7 @@
 
 d = RHSCubeSat; % initialising cubesat data
 
-% to get default desired and current quaternions
-% if (nargin == 0)
-q_current = x(7:10);
-q_desired = QLVLH(x(1:3),x(4:6));
-% end
+%%
 
 model = '3U';
 
@@ -55,6 +52,15 @@ d.jD0 = jD0; % starting Julian date
 
 %% Find desired rotation angle
 
+% to get default desired and current quaternions
+% if (nargin == 0)
+    q_current = x(7:10);
+    q_desired = QLVLH(x(1:3),x(4:6));
+% else % input
+%     q_current = q_c;
+%     q_desired = q_d;
+% end 
+
 % Find the delta quaternion (change in quaternion needed)
 delta_q     = QMult( QPose(q_current), q_desired);
 [angle, u]  = Q2AU( delta_q );
@@ -68,7 +74,4 @@ angular_acceleration = 2*angle / time^2;
 
 single_torque = d.inertia * angular_acceleration; %(1, 1)
 
-% TODO:
-% convert this torque from a single value (1, 1) to 3-axis torque (3, 1)
-
-% T = calculations
+T = single_torque*u;
