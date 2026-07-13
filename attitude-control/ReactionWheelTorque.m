@@ -68,10 +68,12 @@ delta_q     = QMult( QPose(q_current), q_desired);
 % the angle is the amount of rotation needed around the unit vector u
 % calculate a single torque value based on the desired rotation
 
-time = 60; % time wanted to complete torque maneuver 
+time = 60; 
+% time wanted to complete torque maneuver, can be changed and will result 
+% in very different torques.
 
 angular_acceleration = 2*angle / time^2;
 
 single_torque = d.inertia * angular_acceleration; %(1, 1)
 
-T = single_torque*u;
+d.TRW = single_torque*u;
