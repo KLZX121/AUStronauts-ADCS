@@ -14,46 +14,56 @@ end
 
 %% initial states
 
+% orbital elements to find initial pos and vel
+[el, jD0] = ISSOrbit('fixed');
+[r0, v0] = El2RV(el); % [km, km/s]
+
+% attitude quaternion
+q0 = QLVLH(r0, v0);
+
 % angular velocities
 wSat0 = [0; 0; 0;]; % (rad/s)
 wRW0 = [0; 0; 0;];  % (rad/s)
 
-% attitude quaternion
-[el, jD0] = ISSOrbit('fixed');
-[rSat, vSat] = El2RV(el); % [km, km/s]
-q0 = QLVLH(rSat, vSat);
-
-%% plant
-
-% data struct
-% TODO: wrap values somewhere else (another file?)
-% TODO: define body frame (sct has z-axis longitudinal)
-d.ISat = InertiaCubeSat('3U', 6);   % satellite moi
-d.TExt = [0 0 0]';            % external torques
-
-d.IRW = (0.6e-3)/(5600*2*pi/60);    % rw moi
-d.TRW = [0.2e-3; 0.2e-3; 0.2e-3;];                 % rw torques
-% indices of states in state vetor
-d.iQ = 1:4;
-d.iWSat = 5:7;
-d.iWRW = 8:10;
 
 % state vector
-% TODO: properly define a state vector
 x0 = [
+    r0;
+    v0;
     q0;
     wSat0;
     wRW0;
 ];
 
+
+% data struct
+% TODO: define in separate file?
+% TODO: define body frame (sct has z-axis longitudinal)
+% satellite moi
+d.ISat = InertiaCubeSat('3U', 6);
+% external torques
+d.TExt = [0 0 0]';
+% rw moi
+d.IRW = (0.6e-3)/(5600*2*pi/60);
+% rw torques
+d.TRW = [0.2e-3; 0.2e-3; 0.2e-3;];
+% indices of states in state vetor
+d.iR = 1:3;
+d.iV = 4:6;
+d.iQ = 7:10;
+d.iWSat = 11:13;
+d.iWRW = 14:16;
+
+%% plant
+
 % ode state vector functions
-% TODO: better define our data structure and integrate it less messily
+% TODO: replace orbit propagator (FOrbCart) with mission team values
 xDotFn = @(x, t, d) [
+    FOrbCart(x);
     QKinematics(x, d); 
     EulerDynamics(x, d);
     RWDynamics(EulerDynamics(x, d), d);
 ];
-
 
 %% propagate with integrator (RK4)
 % TODO: compare RK4 with ode45 or other integrators
@@ -69,19 +79,45 @@ t = t0:h:tf;
 
 %% plot
 figure('Name', 'State Variables');
-tiledlayout(2, 1)
+tl = tiledlayout(4, 2);
+tl.Title.String = 'State Variables (ECI)';
+tl.Title.FontWeight = 'bold';
 
 nexttile
+plot(t, xList(d.iR, :))
+legend('r_x', 'r_y', 'r_z')
+grid on
+ylabel('r (m)')
+ylim('padded')
+
+nexttile
+plot(t, xList(d.iV, :))
+legend('v_x', 'v_y', 'v_z')
+grid on
+ylabel('v (m/s)')
+ylim('padded')
+
+nexttile([2 1])
 plot(t, xList(d.iQ, :))
-legend("qs", 'q2', 'q3', 'q4')
+legend('q_s', 'q_x', 'q_y', 'q_z')
 grid on
 ylabel('q')
+ylim('padded')
+
+nexttile([2 1])
+plot(t, xList(d.iWSat, :))
+legend('\omega_x', '\omega_y', '\omega_z')
+grid on
+ylabel('\omega_s_a_t (rad/s)')
+ylim('padded')
 
 nexttile
-plot(t, xList(d.iWSat, :))
-legend('wx', 'wy', 'wz')
+plot(t, xList(d.iWRW, :))
+legend('\omega_x', '\omega_y', '\omega_z')
 grid on
-ylabel('\omega (rad/s)')
+ylabel('\omega_r_w (rad/s)')
+ylim('padded')
+
 xlabel('t (s)')
 
 %% attitude change plots
@@ -132,4 +168,4 @@ ylabel('euler angles (deg)')
 xlabel('t (s)')
 
 
-AnimQ(qBL);
+%AnimQ(qBL);
