@@ -4,6 +4,8 @@ clear;
 close all;
 
 format longG
+set(0, 'DefaultLegendLocation', 'eastoutside')
+set(0, 'DefaultLineLineWidth', 1.4)
 
 if isempty(which('Q2Mat'))
     addpath(genpath('../SCT/SCTAcademic'));
