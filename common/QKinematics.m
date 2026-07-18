@@ -15,11 +15,11 @@ function qDot = QKinematics(x, d)
 q = x(d.iQ);
 w = x(d.iWSat);
 
-Xi = @(q) [-q(2:4)'; q(1)*eye(3)+CrossProdM(q(2:4))];
+Omega = @(w) [0 -w'; w -skew(w)];
 
-qDot = 0.5*Xi(q)*w;
+qDot = 0.5*Omega(w)*q;
 
-function M = CrossProdM(v)
+function M = skew(v)
     M = [0, -v(3), v(2);
          v(3), 0, -v(1);
          -v(2), v(1), 0;];
