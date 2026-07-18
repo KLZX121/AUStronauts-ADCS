@@ -21,7 +21,7 @@ end
 [r0, v0] = El2RV(el); % [km, km/s]
 
 % attitude quaternion
-q0 = QLVLH(r0, v0);
+q0 = GetLVLHQ(r0, v0);
 
 % angular velocities
 wSat0 = [0; 0; 0;]; % (rad/s)
@@ -48,7 +48,7 @@ d.TExt = [0 0 0]';
 % rw moi
 d.IRW = (0.6e-3)/(5600*2*pi/60);
 % rw torques
-d.TRW = [0.2e-3; 0.2e-3; 0.2e-3;];
+d.TRW = [0.2e-3; 0; 0;];
 % indices of states in state vetor
 d.iR = 1:3;
 d.iV = 4:6;
@@ -125,8 +125,12 @@ xlabel('t (s)')
 %% attitude change plots
 % euler axis/angle
 % convert attitude quaternion into reference with initial quaternion
-% TODO: QMult's syntax is contradictory - write our own function
-qBL = QMult(xList(d.iQ, :), QPose(q0));
+qBL = zeros(4, size(xList, 2));
+
+for i = 1:size(xList, 2)
+    qBL(:, i) = QProd(xList(d.iQ, i), QConj(q0));
+end
+
 qs = qBL(1, :);
 qv = qBL(2:4, :);
 eulAngle = 2*acos(qs);
@@ -137,7 +141,7 @@ tiledlayout(4, 1)
 
 nexttile
 plot(t, qBL)
-legend('qs', 'q2', 'q3', 'q4')
+legend('q_s', 'q_x', 'q_y', 'q_z')
 ylabel('quaternions')
 grid on
 
@@ -159,6 +163,7 @@ n = size(qBL, 2);
 
 eulAngles = zeros(3, n);
 for i = 1:n
+    % TODO: rewrite Q2Eul
     eulAngles(:, i) = Q2Eul(qBL(:, i));
 end
 

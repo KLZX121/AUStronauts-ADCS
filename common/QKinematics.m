@@ -15,14 +15,8 @@ function qDot = QKinematics(x, d)
 q = x(d.iQ);
 w = x(d.iWSat);
 
-Omega = @(w) [0 -w'; w -skew(w)];
+Omega = @(w) [0 -w'; w -Skew(w)];
 
 qDot = 0.5*Omega(w)*q;
-
-function M = skew(v)
-    M = [0, -v(3), v(2);
-         v(3), 0, -v(1);
-         -v(2), v(1), 0;];
-end
 
 end
