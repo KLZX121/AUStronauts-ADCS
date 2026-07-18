@@ -25,7 +25,15 @@ dMag.quantization = 1e-20;
 % d.quantization - LSB (1e-8)
 
 % get measurements in integer counts, then convert integer counts to tesla
+
+% changed line 66-67 from
+% bBody   = QForm( x(d.kQ), bECI );
+% bSensor = QForm( d.qBToS, bBody );
+% to
+% bBody   = QToDCM(x(d.kQ))*bECI;
+% bSensor = QToDCM(d.qBToS)*bBody;
 bCount = MeasMagnetometerEarth( x, dMag );
+
 bMeas = bCount*dMag.quantization; % [T]
 % convert to unit vector
 uB = bMeas./norm(bMeas);

@@ -30,11 +30,9 @@ r0 = rOrb(:, 1);
 v0 = vOrb(:, 1);
 
 % initialise attitude quaternion to LVLH (ECI -> LVLH)
-% note: SCT puts scalar at q1
-q0 = QLVLH(r0, v0);
+q0 = GetLVLHQ(r0, v0);
 
 % initial state vector
-% x = [rx; ry; rz; vx; vy; vz; q1; q2; q3; q4]
 x = [r0; v0; q0];
 
 %% simulation loop
@@ -64,8 +62,6 @@ for i = 1:nSim
     
     % sun reference vector
     % TODO: improve with SunV2 and compare with SunVectorECI
-    % u         (3,:)   Unit sun vector (vector TO the sun)
-    % r         (1,:)   Distance from origin to sun (km)
     [uSRef, rSRef] = SunV1(jD, r);
     
 
@@ -80,7 +76,7 @@ for i = 1:nSim
     % TODO: investigate choice of first vector (see Wertz pg 425 and footnote)
     
     ATRIAD = TRIAD([uBMeas, uSMeas], [uBRef, uSRef]);
-    qTRIAD = Mat2Q(ATRIAD);
+    qTRIAD = DCMToQ(ATRIAD);
 
     %%% Attitude error
     [thetaErr, qErr] = QAttErr(q0, qTRIAD);

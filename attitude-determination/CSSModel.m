@@ -32,18 +32,26 @@ dSun.noise = zeros(1, 6);
 % d.kQ - indices of quaternion in state vector (7:10)
 
 % SCT FIXES in MeasSunSensorAnalog.m: 
+
 % changed line 65 from
 % p = length(d.m);
 % to
 % p = size(d.m, 2);
+
 % changed line 68 from
 % y = d.m(k,1);
 % to
 % y(k) = d.m(k,1);
+
 % changed line 67 from
 % c = cos(uSunBody'*d.u(:,k));
 % to
 % c = uSunBody'*d.u(:,k);
+
+% changed line 52 from 
+% uSunBody = QForm( q, d.uSunECI );
+% to
+% 
 ySun = MeasSunSensorAnalog(x, dSun);
 % trim negative values
 ySun = max(0, ySun);
