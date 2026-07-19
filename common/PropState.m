@@ -1,9 +1,9 @@
 function [x, xList] = PropState(xDot, x0, d, h, t)
 %PropState Propagates a state vector with RK4
-%   [x, xList] = PropState(xDot, x0, d, h, t0, tf)
+%   [x, xList] = PropState(xDot, x0, d, h, t)
 %   
 %   Inputs
-%   xDot    (n, 1)      State variable ODE function handle
+%   xDot    (n, 1)      @(x, t, d) State variable ODE function handle
 %   x0      (n, 1)      Initial state vector
 %   d       (struct)    Data structure of parameters to pass to ODE
 %   h                   Step size

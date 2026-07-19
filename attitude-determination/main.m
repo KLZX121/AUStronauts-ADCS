@@ -8,6 +8,9 @@ format longG
 if isempty(which('Q2Mat'))
     addpath(genpath('../SCT/SCTAcademic'));
 end
+if isempty(which('QProd'))
+    addpath(genpath('../common'));
+end
 
 %% orbital parameters
 
