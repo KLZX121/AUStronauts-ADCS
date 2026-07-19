@@ -250,58 +250,45 @@ sigma3List = [3*sqrt(max(diag(P0),0)) sigma3List];
 
 %% plots
 
-% abs value
-figure;
-tiledlayout(2, 2)
-
-nexttile
-plot(t./60, xList(1:3, :))
-grid on
-ylabel('\delta angle (rad)')
-ylim('padded')
-
-nexttile
-plot(t./60, xList(4:6, :))
-grid on
-ylabel('gyro bias')
-ylim('padded')
-
-nexttile
-plot(t./60, xList(7:9, :))
-grid on
-ylabel('gyro scale factors')
-ylim('padded')
-
-nexttile
-plot(t./60, xList(10:12, :))
-grid on
-ylabel('gyro upper misalignment')
-ylim('padded')
-
 % error
 figure;
-tiledlayout(2, 2)
+tl = tiledlayout(3, 2);
+tl.Title.String = "MEKF Error Results";
+
+nexttile([1 2])
+plot(t./60, 1e6*xErrList(1:3,:))
+grid on
+ylabel('\delta\vartheta (\murad)')
+xlabel('t (min)')
+ylim([-20 20])
+
+lg = legend('x', 'y', 'z');
+lg.Location = "eastoutside";
 
 nexttile
-plot(t./60, xErrList(1:3,:))
+plot(t./60, rad2deg(xErrList(4:6, :)).*3600)
 grid on
-ylabel('\delta angle (rad)')
-ylim('padded')
+ylabel('\beta (deg/h)')
+xlabel('t (min)')
+ylim([-0.02 0.02])
 
 nexttile
-plot(t./60, xErrList(4:6, :))
+plot(t./60, 1e6*xErrList(7:9, :))
 grid on
-ylabel('gyro bias')
-ylim('padded')
+ylabel('s (ppm)')
+xlabel('t (min)')
+ylim([-60 60])
 
 nexttile
-plot(t./60, xErrList(7:9, :))
+plot(t./60, 1e6*xErrList(10:12, :))
 grid on
-ylabel('gyro scale factors')
-ylim('padded')
+ylabel('k_U (ppm)')
+xlabel('t (min)')
+ylim([-60 60])
 
 nexttile
-plot(t./60, xErrList(10:12, :))
+plot(t./60, 1e6*xErrList(13:15, :))
 grid on
-ylabel('gyro upper misalignment')
-ylim('padded')
+ylabel('k_L (ppm)')
+xlabel('t (min)')
+ylim([-60 60])
