@@ -38,6 +38,11 @@ q0 = GetLVLHQ(r0, v0);
 % initial state vector
 x = [r0; v0; q0];
 
+%% sensor models
+
+dMag = MeasMagnetometerEarth;
+dMag.quantization = 1e-20;
+
 %% simulation loop
 nSim = length(tOrb);
 
@@ -70,9 +75,10 @@ for i = 1:nSim
 
     %%% sensor models (body frame)
     
-    vBMeas = MagModel(x, jD);
+    dMag.jD = jD;
+    vBMeas = MagModel(x, dMag);
     uBMeas = vBMeas/norm(vBMeas);
-    
+
     uSMeas = CSSModel(x, uSRef);
     
 

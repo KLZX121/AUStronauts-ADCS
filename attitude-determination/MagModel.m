@@ -1,10 +1,18 @@
-function vB = MagModel(x, jD0)
+function vB = MagModel(x, d)
 %MagModel Magnetometer Model
-%   vB = MagModel(x, jD0)
+%   vB = MagModel(x, d)
 %   
 %   Inputs
-%   x   (:, 1)  state vector
-%   jD0         Julian Date of epoch
+%   x               (:, 1)      state vector
+%   d                           data struct
+%   .jD             (1, 1)      Julian Date of Epoch
+%   .kR             (1, 3)      indices of ECI pos in state vector
+%   .kQ             (1, 4)      indices of attitude quaternion
+%   .qBToS          (4, 1)      quaternion for body to sensor frame
+%   .bias           (3, 1)      biases
+%   .scale          (3, 1)      scale factors
+%   .noise          (3, 1)      1-sigma noise
+%   .quantization   (1, 1)      Least Significant Bit (LSB)
 %   
 %   Outputs
 %   vB  (3, 1)  vector magnetic field measurement (T) (body frame)
@@ -12,17 +20,6 @@ function vB = MagModel(x, jD0)
 %   TODO: improve with IGRF
 %   TODO: work out scale, bias, noise, quantization
 %   TODO: rewrite function with only orbital position
-
-% set data structure
-dMag = MeasMagnetometerEarth;
-dMag.jD = jD0;
-dMag.quantization = 1e-20;
-% default values:
-% d.kR - indices of ECI position vector in state vector (1:3)
-% d.kQ - indices of attitude quaternion in state vector (7:10)
-% d.qBToS - rotation from body frame to sensor (none)
-% d.scale, d.bias, d.noise - sensor characteristics (ideal)
-% d.quantization - LSB (1e-8)
 
 % get measurements in integer counts, then convert integer counts to tesla
 
@@ -32,8 +29,8 @@ dMag.quantization = 1e-20;
 % to
 % bBody   = QToDCM(x(d.kQ))*bECI;
 % bSensor = QToDCM(d.qBToS)*bBody;
-bCount = MeasMagnetometerEarth( x, dMag );
+bCount = MeasMagnetometerEarth(x, d);
 
-vB = bCount*dMag.quantization; % [T]
+vB = bCount*d.quantization; % [T]
 
 end
