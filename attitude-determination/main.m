@@ -70,7 +70,9 @@ for i = 1:nSim
 
     %%% sensor models (body frame)
     
-    uBMeas = MagModel(x, jD);
+    vBMeas = MagModel(x, jD);
+    uBMeas = vBMeas/norm(vBMeas);
+    
     uSMeas = CSSModel(x, uSRef);
     
 

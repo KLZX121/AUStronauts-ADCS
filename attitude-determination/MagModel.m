@@ -1,13 +1,13 @@
-function uB = MagModel(x, jD0)
+function vB = MagModel(x, jD0)
 %MagModel Magnetometer Model
-%   uB = MagModel(x, jD0)
+%   vB = MagModel(x, jD0)
 %   
 %   Inputs
 %   x   (:, 1)  state vector
 %   jD0         Julian Date of epoch
 %   
 %   Outputs
-%   uB  (3, 1)  unit vector magnetic field measurement (body frame)
+%   vB  (3, 1)  vector magnetic field measurement (T) (body frame)
 %   
 %   TODO: improve with IGRF
 %   TODO: work out scale, bias, noise, quantization
@@ -34,9 +34,6 @@ dMag.quantization = 1e-20;
 % bSensor = QToDCM(d.qBToS)*bBody;
 bCount = MeasMagnetometerEarth( x, dMag );
 
-bMeas = bCount*dMag.quantization; % [T]
-% convert to unit vector
-uB = bMeas./norm(bMeas);
-
+vB = bCount*dMag.quantization; % [T]
 
 end
