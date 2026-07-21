@@ -1,6 +1,8 @@
 function [x, xList] = PropState(xDot, x0, d, h, t)
 %PropState Propagates a state vector with RK4
 %   [x, xList] = PropState(xDot, x0, d, h, t0, tf)
+%
+%   Use for a period of constant values in d
 %   
 %   Inputs
 %   xDot    (n, 1)      State variable ODE function handle
@@ -13,7 +15,7 @@ function [x, xList] = PropState(xDot, x0, d, h, t)
 %   x       (n, 1)      Final state vector
 %   xList   (n, :)      List of state vectors at each timestep
 
-N = (t(end)-t(1))/h;
+N = round((t(end)-t(1))/h);
 
 xList = zeros(size(x0, 1), N+1);
 xList(:, 1) = x0;

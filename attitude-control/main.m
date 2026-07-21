@@ -75,7 +75,11 @@ t0 = 0;
 tf = 60;
 t = t0:h:tf;
 
-[x, xList] = PropState(xDotFn, x0, d, h, t);
+[x, xList1] = PropState(xDotFn, x0, d, h, t0:h:(tf/2));
+d.TRW = [0; 0; 0;];
+[x, xList2] = PropState(xDotFn, x, d, h, (tf/2):h:tf);
+
+xList = [xList1 xList2(:, 2:end)];
 
 %out = RK4Convergence(x0, xDotFn, d, 15);
 
@@ -133,7 +137,7 @@ end
 
 qs = qBL(1, :);
 qv = qBL(2:4, :);
-eulAngle = 2*acos(qs);
+eulAngle = 2*acos(min(qs, 1));
 eulAxis = qv./vecnorm(qv, 2, 1);
 
 figure('Name', 'Attitude (LVLH -> body)');
