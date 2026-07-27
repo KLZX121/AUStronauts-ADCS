@@ -21,6 +21,8 @@ kLTrue = 1e-6*[500; 1000; 1500];
 SFn = @(s, kU, kL) [s(1) kU(1) kU(2); kL(1) s(2) kU(3); kL(2) kL(3) s(3)];
 STrue = SFn(sTrue, kUTrue, kLTrue);
 
+C = inv(eye(3) + STrue);
+
 % variance
 sigv = sqrt(10)*1e-7;
 sigu = sqrt(10)*1e-10;
@@ -32,7 +34,7 @@ Q = blkdiag(sigv^2*eye(3), sigu^2*eye(3));
 
 qTrue0 = (sqrt(2)/2).*[1; 1; 0; 0];
 
-wTrueFn = @(t) deg2rad(0.1).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
+wTrueFn = @(t) deg2rad(10).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
 
 % gyro bias random walk
 bTrueFn = @(bOld, dt) bOld + sigu*sqrt(dt)*randn(3, 1);
@@ -70,12 +72,12 @@ P0 = blkdiag( ...
 
 %% state model
 
-function [F, G] = StateMatrices(wEst, STrue)
+function [F, G] = StateMatrices(wEst, C)
     F = [
-        -Skew(wEst), -(eye(3)-STrue);
+        -Skew(wEst), -C;
         zeros(3, 6);
     ];
-    G = blkdiag(-(eye(3)-STrue), eye(3));
+    G = blkdiag(-C, eye(3));
 end
 
 %% observation model (magnetometer)
@@ -204,8 +206,8 @@ for k = 1:nSim
 
     % calculate state models
     bEst = xEst(4:6);
-    wEst = (eye(3) - STrue)*(wGyro - bEst);
-    [F, G] = StateMatrices(wEst, STrue);
+    wEst = C*(wGyro - bEst);
+    [F, G] = StateMatrices(wEst, C);
 
     P = PropPDiscrete(P, F, G, Q, dt, NStates);
     qEst = PropQDiscrete(qEst, wEst, dt);
@@ -234,6 +236,7 @@ for k = 1:nSim
     xTrue(4:6) = bTrue;
     xErrList(4:6, k) = xTrue(4:6) - xEst(4:6);
     sigma3List(:, k) = 3*sqrt(max(diag(P),0));
+    
 end
 toc
 
