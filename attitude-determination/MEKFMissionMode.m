@@ -169,6 +169,7 @@ xList = zeros(NStates, nSim);
 xErrList = zeros(NStates, nSim);
 sigma3List = zeros(NStates, nSim);
 
+tic
 for k = 1:nSim
     wTrue = wTrueFn(t(k));
 
@@ -234,6 +235,7 @@ for k = 1:nSim
     xErrList(4:6, k) = xTrue(4:6) - xEst(4:6);
     sigma3List(:, k) = 3*sqrt(max(diag(P),0));
 end
+toc
 
 xList = [x0 xList];
 xErrList = [xTrue0 xErrList];
