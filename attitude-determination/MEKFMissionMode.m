@@ -154,7 +154,7 @@ xTrue = xTrue0;
 %%% simulation loop
 
 t0 = 0;
-tf = 270*60;
+tf = 90*60;
 dt = 5;
 
 nSim = (tf-t0)/dt;
@@ -244,20 +244,33 @@ sigma3List = [3*sqrt(max(diag(P0),0)) sigma3List];
 figure;
 tl = tiledlayout(2, 1);
 tl.Title.String = "MEKF Results";
+colororder(lines(3))
+set(0, 'DefaultLineLineWidth', 1.4)
 
-nexttile()
+nexttile
 plot(t./60, rad2deg(xErrList(1:3,:)))
 grid on
 ylabel('\delta\vartheta (deg)')
 xlabel('t (min)')
 %ylim([-0.1 2e-1])
 
-lg = legend('x', 'y', 'z');
+hold on
+plot(t./60, rad2deg(sigma3List(1:3, :)), ':')
+plot(t./60, -rad2deg(sigma3List(1:3, :)), ':')
+hold off
+
+lg = legend('x', 'y', 'z', '3-\sigma_x', '3-\sigma_y', '3-\sigma_z');
 lg.Location = "eastoutside";
+
 
 nexttile
 plot(t./60, rad2deg(xErrList(4:6, :)).*3600)
 grid on
-ylabel('\beta (deg/h)')
+ylabel('\Delta\beta (deg/h)')
 xlabel('t (min)')
 %ylim([-0.2 0.2])
+
+hold on
+plot(t./60, rad2deg(sigma3List(4:6, :)).*3600, ':')
+plot(t./60, -rad2deg(sigma3List(4:6, :)).*3600, ':')
+hold off
