@@ -1,10 +1,10 @@
-%function P_RWA = ReactionWheelPower(T)
+function P_RWA = ReactionWheelPower(T)
 
 %% Program Summary
 
 % INPUTS
 % T                     (3, 1) control torque in 3 dimensions, should be
-% lower than 5.36 uNm for each value (x, y, z)
+% lower than 200 uNm for each value (x, y, z)
 
 % OUTPUT
 % P_RWA                 (3, 1) power vector: amount of power to be supplied
@@ -36,4 +36,4 @@ P = P + 0.1; % correct for idle power offset of 0.1W
 
 P_RWA = P;
 
-
+end

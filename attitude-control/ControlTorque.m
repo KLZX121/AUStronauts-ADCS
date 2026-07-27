@@ -15,53 +15,22 @@ function T_c = ControlTorque(q_d, q_c, time)
 % OUTPUT
 % T                     (3, 1) control torque vector (x,y,z)
 
-%% CubeSat Physical Data (Used to find example quaternion)
+%% CubeSat Data
 
-d = RHSCubeSat; % initialising cubesat data
-
-model = '3U';
-
-[area,nFace,rFace] = CubeSatFaces( model, 1 ); % get face data 
-% (areas, normals, distance from centre)
-
-% surface data
-d.surfData.area = area;
-d.surfData.nFace = nFace;
-d.surfData.rFace = rFace;
-d.surfData.att.type = 'eci';
-d.atm = [];
-
-d.mass = 6; % kg
-d.inertia = InertiaCubeSat(model, d.mass); % assuming uniform distribution
+inertiaSat = InertiaCubeSat('3U', 6); % assuming uniform distribution
 % TODO: update to our cubesat data from structure team (mass, inertia,
 % areas)
 
-%% ISS Model of orbit for current direction (for example quaternions)
-% [WILL CHANGE DEPENDING ON OUR ORBIT]
-
-x = d.x0; % default
-[el, jD0] = ISSOrbit;
-[r,v] = El2RV(el);
-x(1:3) = r; % position vector
-x(4:6) = v; % velocity vector
-d.jD0 = jD0; % starting Julian date
-
 %% Find desired rotation angle
 
-% to get default desired and current quaternions and time
-if (nargin == 0)
-    q_current = x(7:10);
-    q_desired = QLVLH(x(1:3),x(4:6));
-    t = 600;
-else % input
-     q_current = q_c;
-     q_desired = q_d;
-     t = time;
-end 
-
+% input
+q_current = q_c;
+q_desired = q_d;
+t = time;
+ 
 % Find the delta quaternion (change in quaternion needed)
-delta_q     = QMult( QPose(q_current), q_desired);
-[angle, u]  = Q2AU( delta_q );
+delta_q     = QProd( QConj(q_current), q_desired);
+[angle, u]  = QAngleUnit( delta_q );
 
 % the angle is the amount of rotation needed around the unit vector u
 % calculate a single torque value based on the desired rotation
@@ -71,7 +40,7 @@ delta_q     = QMult( QPose(q_current), q_desired);
 
 angular_acceleration = 2*angle / t^2;
 
-single_torque = d.inertia * angular_acceleration; %(1, 1)
+single_torque = inertiaSat * angular_acceleration; %(1, 1)
 
 T_c = single_torque*u; % torque * unit vector
 
