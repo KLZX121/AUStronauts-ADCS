@@ -33,7 +33,7 @@ Q = blkdiag(sigv^2*eye(3), sigu^2*eye(3), sigs^2*eye(3), sigU^2*eye(3), sigL^2*e
 %% dynamics
 
 qTrue0 = (sqrt(2)/2).*[1; 0; 0; 1];
-wTrueFn = @(t) deg2rad(0.1).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
+wTrueFn = @(t) deg2rad(10).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
 
 % gyro bias random walk
 bTrueFn = @(bOld, dt) bOld + sigu*sqrt(dt)*randn(3, 1);
@@ -104,25 +104,25 @@ end
 
 %% observation model
 
-% measurement sensitivity matrix
-h = zeros(3, 1);
-H = [eye(3) zeros(3, NStates-3)];
-
 % measurement covariance
-sigmaMeas = 6*pi/(180*3600);
-RMeas = sigmaMeas^2*eye(3);
+sigmaST = 6*pi/(180*3600);
+RST = sigmaST^2*eye(3);
 
-R = blkdiag(RMeas);
+R = blkdiag(RST);
 
 % simulate star tracker measurement
-function y = SimST(qTrue, qEst, sigmaMeas)
-    noise = sigmaMeas*randn(3, 1);
+function [y, h, H] = SimST(qTrue, qEst, sigmaST)
+    noise = sigmaST*randn(3, 1);
     dq = [1; 0.5*noise];
     dq = dq./norm(dq);
     qStar = QProd(dq, qTrue);
 
     qMeas = QProd(qStar, QConj(qEst));
     y = 2*qMeas(2:4)./qMeas(1);
+
+    % measurement sensitivity matrix
+    h = zeros(3, 1);
+    H = [eye(3) zeros(3, 12)];
 end
 
 %% discrete propagation functions
@@ -182,9 +182,13 @@ xErrList = zeros(NStates, nSim);
 sigma3List = zeros(NStates, nSim);
 
 for k = 1:nSim
+    %%% simulate measurement
+    [y, h, H] = SimST(qTrue, qEst, sigmaST);
+
+
     %%% calculate gain
     
-    K = P*H'*inv(H*P*H'+R);
+    K = P*H' / (H*P*H'+R);
     
 
     %%% update
@@ -194,7 +198,6 @@ for k = 1:nSim
     
     % update estimated state with measurements
     xEst(1:3) = zeros(3, 1);
-    y = SimST(qTrue, qEst, sigmaMeas);
     xEst = xEst + K*(y - h);
     
     % update estimated quaternion with error angle
