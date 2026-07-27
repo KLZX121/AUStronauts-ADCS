@@ -155,7 +155,7 @@ xTrue = xTrue0;
 
 t0 = 0;
 tf = 90*60;
-dt = 5;
+dt = 1;
 
 nSim = (tf-t0)/dt;
 t = t0:dt:tf;
@@ -179,7 +179,7 @@ for k = 1:nSim
 
     %%% calculate gain
     
-    K = P*H'*inv(H*P*H'+R);
+    K = P*H' / (H*P*H'+R);
     
 
     %%% update
@@ -194,6 +194,7 @@ for k = 1:nSim
     xEst = xEst + K*(y - h);
     
     % update estimated quaternion with error angle
+    % TODO: review this, use more rigorous update using angErr
     qEst = qEst + QKinematics([qEst; xEst(1:3)], struct('iQ', 1:4, 'iWSat', 5:7));
     qEst = qEst./norm(qEst);
 
