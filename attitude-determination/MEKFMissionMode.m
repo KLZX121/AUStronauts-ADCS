@@ -30,7 +30,7 @@ Q = blkdiag(sigv^2*eye(3), sigu^2*eye(3));
 
 %% dynamics
 
-qTrue0 = (sqrt(2)/2).*[0; 1; 0; 1];
+qTrue0 = (sqrt(2)/2).*[1; 1; 0; 0];
 
 wTrueFn = @(t) [-2*pi/5400; 0; 0;];
 
@@ -241,7 +241,7 @@ for k = 1:nSim
 
     xList(:, k) = xEst;
 
-    qErr = QProd(qEst, QConj(qTrue));
+    qErr = QProd(qTrue, QConj(qEst));
     qErr = qErr/norm(qErr);
     
     if qErr(1) < 0

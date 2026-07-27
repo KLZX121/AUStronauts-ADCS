@@ -3,6 +3,10 @@
 clear;
 close all;
 
+if isempty(which('QProd'))
+    addpath(genpath('../common'));
+end
+
 %% gyro calibration parameters
 
 % bias, scale factors, misalignments
@@ -229,7 +233,7 @@ for k = 1:nSim
 
     xList(:, k) = xEst;
 
-    qErr = QProd(qEst, QConj(qTrue));
+    qErr = QProd(qTrue, QConj(qEst));
     qErr = qErr/norm(qErr);
     
     if qErr(1) < 0
@@ -292,3 +296,10 @@ grid on
 ylabel('k_L (ppm)')
 xlabel('t (min)')
 ylim([-60 60])
+
+figure;
+plot(t./60, 1e6*xList(1:3,:))
+grid on
+ylabel('\delta\vartheta (\murad)')
+xlabel('t (min)')
+ylim([-20 20])
