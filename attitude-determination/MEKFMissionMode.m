@@ -32,7 +32,7 @@ Q = blkdiag(sigv^2*eye(3), sigu^2*eye(3));
 
 qTrue0 = (sqrt(2)/2).*[1; 1; 0; 0];
 
-wTrueFn = @(t) [-2*pi/5400; 0; 0;];
+wTrueFn = @(t) deg2rad(0.1).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
 
 % gyro bias random walk
 bTrueFn = @(bOld, dt) bOld + sigu*sqrt(dt)*randn(3, 1);
@@ -70,33 +70,12 @@ P0 = blkdiag( ...
 
 %% state model
 
-function [F, G] = StateMatrices(wEst)
+function [F, G] = StateMatrices(wEst, STrue)
     F = [
-        -Skew(wEst), -eye(3);
+        -Skew(wEst), -(eye(3)-STrue);
         zeros(3, 6);
     ];
-    G = blkdiag(-eye(3), eye(3));
-end
-
-%% observation model (star tracker)
-
-% measurement covariance
-sigmaMeas = deg2rad(0.005/3);
-RST = sigmaMeas^2*eye(3);
-
-% simulate star tracker measurement
-function [y, h, H] = SimST(qTrue, qEst, sigmaMeas)
-    noise = sigmaMeas*randn(3, 1);
-    dq = [1; 0.5*noise];
-    dq = dq./norm(dq);
-    qStar = QProd(dq, qTrue);
-
-    qMeas = QProd(qStar, QConj(qEst));
-    y = 2*qMeas(2:4)./qMeas(1);
-
-    % measurement sensitivity matrix
-    H = [eye(3) zeros(3, 3)];
-    h = zeros(3, 1);
+    G = blkdiag(-(eye(3)-STrue), eye(3));
 end
 
 %% observation model (magnetometer)
@@ -175,7 +154,7 @@ xTrue = xTrue0;
 %%% simulation loop
 
 t0 = 0;
-tf = 90*60;
+tf = 270*60;
 dt = 5;
 
 nSim = (tf-t0)/dt;
@@ -194,7 +173,6 @@ for k = 1:nSim
     wTrue = wTrueFn(t(k));
 
     %%% simulate measurements
-    %[y, h, H] = SimST(qTrue, qEst, sigmaMeas);
     [y, h, H] = SimMag(rOrb(:, k), jDOrb(k), qTrue, qEst, sigmaMag);
     wGyro = wGyroFn(wTrue, bTrue, dt);
 
@@ -225,7 +203,7 @@ for k = 1:nSim
     % calculate state models
     bEst = xEst(4:6);
     wEst = (eye(3) - STrue)*(wGyro - bEst);
-    [F, G] = StateMatrices(wEst);
+    [F, G] = StateMatrices(wEst, STrue);
 
     P = PropPDiscrete(P, F, G, Q, dt, NStates);
     qEst = PropQDiscrete(qEst, wEst, dt);
