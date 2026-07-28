@@ -1,6 +1,6 @@
 function [x, xList] = PropState(xDot, x0, d, h, t)
 %PropState Propagates a state vector with RK4
-%   [x, xList] = PropState(xDot, x0, d, h, t0, tf)
+%   [x, xList] = PropState(xDot, x0, d, h, t)
 %
 %   Use for a period of constant values in d
 %   
