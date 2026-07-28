@@ -182,8 +182,11 @@ xErrList = zeros(NStates, nSim);
 sigma3List = zeros(NStates, nSim);
 
 for k = 1:nSim
+    wTrue = wTrueFn(t(k));
+
     %%% simulate measurement
     [y, h, H] = SimST(qTrue, qEst, sigmaST);
+    wGyro = wGyroFn(wTrue, bTrue, dt);
 
 
     %%% calculate gain
@@ -194,7 +197,7 @@ for k = 1:nSim
     %%% update
     
     % update covariance
-    P = (eye(size(P, 1))-K*H)*P;
+    P = (eye(NStates)-K*H)*P;
     
     % update estimated state with measurements
     xEst(1:3) = zeros(3, 1);
@@ -212,9 +215,7 @@ for k = 1:nSim
     SEst = SFn(sEst, kUEst, kLEst);
 
 
-    %%% propagate (discrete)
-    
-    wGyro = wGyroFn(wTrue, bTrue, dt);    
+    %%% propagate (discrete)   
 
     % calculate state models
     wEst = (eye(3) - SEst)*(wGyro - bEst);
@@ -229,8 +230,6 @@ for k = 1:nSim
     bTrue = bTrueFn(bTrue, dt);
     qTrue = PropQDiscrete(qTrue, wTrue, dt);
     qTrue = qTrue/norm(qTrue);
-
-    wTrue = wTrueFn(t(k+1));
 
     %%% save data
 

@@ -188,12 +188,10 @@ for k = 1:nSim
     %%% update
     
     % update covariance
-    P = (eye(size(P, 1))-K*H)*P;
+    P = (eye(NStates)-K*H)*P;
     
-    % explicit reset of attitude errors
+    % update estimated state with measurements
     xEst(1:3) = zeros(3, 1);
-    % update estimated state
-    % note: biases are implicitly reset
     xEst = xEst + K*(y - h);
     
     % update estimated quaternion with error angle
