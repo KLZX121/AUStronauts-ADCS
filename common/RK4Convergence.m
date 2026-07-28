@@ -57,7 +57,6 @@ for testI = 1:nTests
     h = out.hList(testI);
 
     % run RK4 with step
-    t = dTest.t0:h:dTest.tf;
     N = (dTest.tf-dTest.t0)/h;
 
     fprintf("Test %d: step size = %f steps = %d\n", testI, h, N)
@@ -66,7 +65,7 @@ for testI = 1:nTests
     
     tic
     for i = 1:N
-        x = RK4(xDotFn, x, h, t(i), d);
+        x = PropState(xDotFn, x, d, h);
     end
     out.xList(:, testI) = x;
     simTime = toc;

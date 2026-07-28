@@ -37,18 +37,25 @@ x0 = [
     wRW0;
 ];
 
+nStates = 16;
+
 
 % data struct
 % TODO: define in separate file?
 % TODO: define body frame (sct has z-axis longitudinal)
 % satellite moi
 d.ISat = InertiaCubeSat('3U', 6);
+
 % external torques
 d.TExt = [0 0 0]';
+
 % rw moi
 d.IRW = (0.6e-3)/(5600*2*pi/60);
 % rw torques
-d.TRW = [0.2e-3; 0; 0;];
+d.TRW = [0.2e-3; 0; 0;]; % N m
+% max rw speed
+d.maxWRW = 5600*2*pi/60; % rad/s
+
 % indices of states in state vetor
 d.iR = 1:3;
 d.iV = 4:6;
@@ -60,7 +67,7 @@ d.iWRW = 14:16;
 
 % ode state vector functions
 % TODO: replace orbit propagator (FOrbCart) with mission team values
-xDotFn = @(x, t, d) [
+xDotFn = @(x, d) [
     FOrbCart(x);
     QKinematics(x, d); 
     EulerDynamics(x, d);
@@ -68,20 +75,38 @@ xDotFn = @(x, t, d) [
 ];
 
 %% propagate with integrator (RK4)
-% TODO: compare RK4 with ode45 or other integrators
-% TODO: write own RK4 to better suit the structure of our code
-h = 0.1;
+h = 1;
 t0 = 0;
-tf = 60;
+tf = 90*60;
+
 t = t0:h:tf;
+nSim = length(t);
 
-[x, xList1] = PropState(xDotFn, x0, d, h, t0:h:(tf/2));
-d.TRW = [0; 0; 0;];
-[x, xList2] = PropState(xDotFn, x, d, h, (tf/2):h:tf);
+xList = zeros(nStates, nSim);
+xList(:, 1) = x0;
+x = x0;
 
-xList = [xList1 xList2(:, 2:end)];
+tic
+for i = 2:nSim
+    % compute disturbances
+    % TODO: rewrite our own disturbance functions since these use sct's q
+    TGrav = GravityGradientFromR(x(d.iQ), d.ISat, x(d.iR), 3.98600436e5);
 
-%out = RK4Convergence(x0, xDotFn, d, 15);
+    d.TExt = TGrav;
+
+    % reaction wheel saturation (testing only - should be implemented in controller)
+    if (any(d.TRW) && any(abs(x(d.iWRW)) > d.maxWRW))
+        d.TRW = [0; 0; 0;];
+    end
+
+
+    x = PropState(xDotFn, x, d, h);
+    xList(:, i) = x;
+end
+toc
+
+
+% out = RK4Convergence(x0, xDotFn, d, 10, 6, struct("t0", t0, "tf", tf, "h0", 10));
 
 %% plot
 figure('Name', 'State Variables');
@@ -129,9 +154,9 @@ xlabel('t (s)')
 %% attitude change plots
 % euler axis/angle
 % convert attitude quaternion into reference with initial quaternion
-qBL = zeros(4, size(xList, 2));
+qBL = zeros(4, nSim);
 
-for i = 1:size(xList, 2)
+for i = 1:nSim
     qBL(:, i) = QProd(xList(d.iQ, i), QConj(q0));
 end
 
@@ -163,10 +188,8 @@ ylim('padded')
 
 % euler angles (3-2-1)
 
-n = size(qBL, 2);
-
-eulAngles = zeros(3, n);
-for i = 1:n
+eulAngles = zeros(3, nSim);
+for i = 1:nSim
     % TODO: rewrite Q2Eul
     eulAngles(:, i) = Q2Eul(qBL(:, i));
 end
