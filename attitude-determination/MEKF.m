@@ -2,7 +2,8 @@ classdef(Abstract) MEKF < handle
 %MEKF Abstract superclass for MEKF subclasses
 %   
 %   Subclasses:
-%       MissionMEKF
+%       MEKFNominal
+%       MEKFGyroCal
 %   
 %   Methods:
 %       Initialise
@@ -34,6 +35,15 @@ properties(SetAccess=protected)
 end
 
 methods(Static)
+    %%% compose the calibration matrix S
+    function S = SMatrix(s, kU, kL)
+        S = [
+            s(1) kU(1) kU(2);
+            kL(1) s(2) kU(3);
+            kL(2) kL(3) s(3)
+        ];
+    end
+
     %%% gyro measurement function
     function wGyro = GyroMeasurement(wTrue, STrue, bTrue, sig)
         wGyro = (eye(3) + STrue)*wTrue + bTrue + sig*randn(3, 1);
@@ -69,17 +79,17 @@ methods(Static)
     end
 end
 methods(Abstract, Static)
-    Plot(xErrList)
+    Plot(t, xErrList, sigma3List)
 end
 methods(Abstract, Access=protected)
     wEst = wEstFn(o, wGyro)
     [y, h, H] = MeasurementMatrices(o, extData)
-    [F, G] = StateMatrices(o)
+    [F, G] = StateMatrices(o, wGyro)
 end
 methods
     function o = Initialise(o, x0, q0, P0, STrue, Q, R)
         %Initialise Initialises the filter with initial values
-        %   o = Initialise(x0, q0, P0, STrue, Q, R)
+        %   o = Initialise(o, x0, q0, P0, STrue, Q, R)
         %   
         %   Inputs
         %   x0      (n, 1)  Initial estimated state vector
@@ -99,7 +109,7 @@ methods
     
     function o = Step(o, dt, extData)
         %Step Steps the filter forward by one timestep
-        %   o = Step(dt, extData)
+        %   o = Step(o, dt, extData)
         %   
         %   Use this function within the simulation loop
         %
@@ -130,7 +140,7 @@ methods
     
         % propagate dynamics
         o.wEst = o.wEstFn(extData.wGyro);
-        [o.F, o.G] = o.StateMatrices();
+        [o.F, o.G] = o.StateMatrices(extData.wGyro);
     
         o.P = o.PropPDisc(o.P, o.F, o.G, o.Q, o.nStates, dt);
         o.qEst = o.PropQDisc(o.qEst, o.wEst, dt);
@@ -138,7 +148,7 @@ methods
 
     function xErr = CalcError(o, qTrue, xiTrue)
         %CalcError Generates the state error
-        %   xErr = CalcError(qTrue, xiTrue)
+        %   xErr = CalcError(o, qTrue, xiTrue)
         %
         %   Inputs
         %   qTrue   (4, 1)      True quaternion
@@ -146,21 +156,23 @@ methods
         %
         %   Outputs
         %   xErr    (n, 1)      Error state vector
+        
+        xErr = zeros(o.nStates, 1);
 
         qErr = QProd(qTrue, QConj(o.qEst));
         qErr = qErr/norm(qErr); 
         angErr = 2*qErr(2:4)/qErr(1);
 
         xErr(1:3) = angErr;
-        xErr(4:6) = xiTrue - o.xEst(4:end);
+        xErr(4:end) = xiTrue - o.xEst(4:end);
     end
 
     function xSigma3 = CalcSigma3(o)
-        %CalcSigma3 Calculates the 3-sigma bound
-        %   xSigma3 = CalcSigma3()
+        %CalcSigma3 Calculates the 3-sigma bounds
+        %   xSigma3 = CalcSigma3(o)
         %
         %   Outputs
-        %   xSigma3    (n, 1)      3-sigma bound for each state
+        %   xSigma3    (n, 1)      3-sigma bounds for each state
         
         xSigma3 = 3*sqrt(max(diag(o.P),0));
     end

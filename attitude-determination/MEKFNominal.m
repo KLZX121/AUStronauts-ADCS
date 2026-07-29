@@ -1,8 +1,12 @@
-classdef MissionMEKF < MEKF
-%MissionMEKF A 6-state MEKF involving attitude and gyro biases
-%   mekf = MissionMEKF
+classdef MEKFNominal < MEKF
+%MEKFNominal A 6-state MEKF involving attitude and gyro biases
+%   mekf = MEKFNominal
 %
-%   State vector: x (6) = [attitude error (3); gyro biases (3)]
+%   State Vector
+%   x (6) = [
+%           attitude error (3); 
+%           gyro biases (3)
+%   ]
 %
 %   See the MEKF parent class for more documentation on methods
 
@@ -27,7 +31,6 @@ methods(Access=protected)
         
         wEst = o.C*(wGyro - bEst);
     end
-
     % TODO: once magnetometer model is written, use y directly from
     % that
     function [y, h, H] = MeasurementMatrices(o, extData)
@@ -48,11 +51,10 @@ methods(Access=protected)
         y = bMeas + extData.sigmaMag*randn(3, 1);
     
 
-        H = [Skew(bEst) zeros(3, 3)];
+        H = [Skew(bEst) zeros(3, o.nStates-3)];
         h = bEst;
     end
-
-    function [F, G] = StateMatrices(o)
+    function [F, G] = StateMatrices(o, ~)
         F = [
             -Skew(o.wEst), -o.C;
             zeros(3, 6);
@@ -72,7 +74,7 @@ methods(Static)
         
         figure;
         tl = tiledlayout(2, 1);
-        tl.Title.String = "MEKF Results";
+        tl.Title.String = "MEKF State Errors";
         colororder(lines(3))
         set(0, 'DefaultLineLineWidth', 1.4)
         
