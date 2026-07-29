@@ -16,6 +16,9 @@ classdef MEKFGyroCal < MEKF
 properties(Constant)
     nStates = 15;
 end
+properties
+    CEst (:, :) double
+end
 
 methods(Access=protected)
     function wEst = wEstFn(o, wGyro)
@@ -25,8 +28,9 @@ methods(Access=protected)
         kUEst = o.xEst(10:12);
         kLEst = o.xEst(13:15);
         SEst = MEKF.SMatrix(sEst, kUEst, kLEst);
+        o.CEst = eye(3) / (eye(3) + SEst);
 
-        wEst = (eye(3) - SEst)*(wGyro - bEst);
+        wEst = o.CEst*(wGyro - bEst);
     end
     function [y, h, H] = MeasurementMatrices(o, extData)
         noise = extData.sigmaST*randn(3, 1);
@@ -41,30 +45,23 @@ methods(Access=protected)
         h = zeros(3, 1);
         H = [eye(3) zeros(3, o.nStates-3)];
     end
-    function [F, G] = StateMatrices(o, wGyro)
-        bEst = o.xEst(4:6);
-
-        sEst = o.xEst(7:9);
-        kUEst = o.xEst(10:12);
-        kLEst = o.xEst(13:15);
-        SEst = MEKF.SMatrix(sEst, kUEst, kLEst);
-
+    function [F, G] = StateMatrices(o)
         U = [
-            wGyro(2)-bEst(2), wGyro(3)-bEst(3), 0;
-            0, 0, wGyro(3)-bEst(3);
+            o.wEst(2), o.wEst(3), 0;
+            0, 0, o.wEst(3);
             0, 0, 0
         ];
         L = [
             0, 0, 0;
-            wGyro(1)-bEst(1), 0, 0;
-            0, wGyro(1)-bEst(1), wGyro(2)-bEst(2);
+            o.wEst(1), 0, 0;
+            0, o.wEst(1), o.wEst(2);
         ];
     
         F = [
-            -Skew(o.wEst), -(eye(3) - SEst), -diag(wGyro - bEst), -U, -L;
+            -Skew(o.wEst), -o.CEst, -o.CEst*diag(o.wEst), -o.CEst*U, -o.CEst*L;
             zeros(12, 15)
         ];
-        G = blkdiag(-(eye(3)-SEst), eye(3), eye(3), eye(3), eye(3));
+        G = blkdiag(-o.CEst,eye(12));
     end
 end
 methods(Static)

@@ -84,7 +84,7 @@ end
 methods(Abstract, Access=protected)
     wEst = wEstFn(o, wGyro)
     [y, h, H] = MeasurementMatrices(o, extData)
-    [F, G] = StateMatrices(o, wGyro)
+    [F, G] = StateMatrices(o)
 end
 methods
     function o = Initialise(o, x0, q0, P0, STrue, Q, R)
@@ -140,7 +140,7 @@ methods
     
         % propagate dynamics
         o.wEst = o.wEstFn(extData.wGyro);
-        [o.F, o.G] = o.StateMatrices(extData.wGyro);
+        [o.F, o.G] = o.StateMatrices();
     
         o.P = o.PropPDisc(o.P, o.F, o.G, o.Q, o.nStates, dt);
         o.qEst = o.PropQDisc(o.qEst, o.wEst, dt);

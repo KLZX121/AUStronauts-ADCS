@@ -54,7 +54,7 @@ methods(Access=protected)
         H = [Skew(bEst) zeros(3, o.nStates-3)];
         h = bEst;
     end
-    function [F, G] = StateMatrices(o, ~)
+    function [F, G] = StateMatrices(o)
         F = [
             -Skew(o.wEst), -o.C;
             zeros(3, 6);
