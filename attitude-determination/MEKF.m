@@ -77,9 +77,67 @@ methods(Static)
     
         qNew = Theta*qOld;
     end
-end
-methods(Abstract, Static)
-    Plot(t, xErrList, sigma3List)
+
+    function Plot(figData)
+        %Plot Creates a tiledlayout figure of state errors for subclasses
+        %   Plot(figData)
+        %   
+        %   Inputs
+        %   t           (1, :)      List of timesteps (s)
+        %   xErrList    (n, :)      List of error states
+        %   sigma3List  (n, :)      List of 3-sigma bounds
+        %   figData     (struct)    Information to create the figure
+        %   .figName    (string)    Name of figure
+        %   .tlDim      (2, 1)      Number of [rows, cols] of tiledlayout
+        %   .plotSizes  (n/3, 2)    Number of tiles that each plot takes up
+        %                           [1 1] for 1 row, 1 col
+        %                           [1 2] for 1 row, 2 col etc.
+        %   .yLabels    (n/3, 1)    String array of plot y-axis labels
+        %   .xLabel     string      x-axis label for all plots
+        %   .y          {n/3, 1}    Cell array of state errors to plot
+        %   .sigma3s    {n/3, 1}    Cell array of 3-sigma bounds to plot
+        %   .x          (:, 1)      Timesteps to plot
+
+        figure("Name", figData.figName);
+
+        tl = tiledlayout(figData.tlDim(1), figData.tlDim(2));
+        tl.Title.String = "MEKF State Errors";
+        colororder(lines(3))
+        set(0, 'DefaultLineLineWidth', 1.4)
+
+        nPlots = size(figData.plotSizes, 1);
+
+        for i = 1:nPlots
+            nexttile(figData.plotSizes(i, :))
+            plot(figData.x, figData.y{i})
+            grid on
+            ylabel(figData.yLabels(i))
+            xlabel(figData.xLabel)
+            hold on
+            plot(figData.x, figData.sigma3s{i}, ':')
+            plot(figData.x, -figData.sigma3s{i}, ':')
+            hold off
+            ylim(yBounds(figData.sigma3s{i}, figData.y{i}));
+
+            if (i == 1)
+                lg = legend('x', 'y', 'z', '3-\sigma_x', '3-\sigma_y', '3-\sigma_z');
+                lg.Location = "eastoutside";
+            end
+        end
+
+        function bound = yBounds(sigVals, xVals)
+            % sets smart y limits
+            
+             % get the timestep with smallest sigma-3 bound
+            [~, minI] = min(sum(sigVals));
+
+            % get max of [sigma-3; x] at this timestep
+            % set y limits to 3 times this value
+            y = 3*(max([sigVals(:, minI); xVals(:, minI)]));
+
+            bound = [-y y];
+        end
+    end
 end
 methods(Abstract, Access=protected)
     wEst = wEstFn(o, wGyro)

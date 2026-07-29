@@ -20,6 +20,46 @@ properties
     CEst (:, :) double
 end
 
+methods(Static)
+    function Plot(t, xErrList, sigma3List)
+        %Plot Plots the state errors over time, as well as 3-sigma bounds
+        %   Plot(t, xErrList, sigma3List)
+        %   
+        %   Inputs
+        %   t           (1, :)      List of timesteps (s)
+        %   xErrList    (n, :)      List of error states
+        %   sigma3List  (n, :)      List of 3-sigma bounds
+
+        figData.figName = "Gyro Calibration MEKF";
+        figData.tlDim = [3, 2];
+        figData.plotSizes = [[1 2]; repmat([1 1], 4, 1)];
+        figData.yLabels = [
+            "\delta\vartheta (deg)"; 
+            "\Delta\beta (deg/h)"; 
+            "\Deltas"; 
+            "\Deltak_U"; 
+            "\Deltak_L"
+        ];
+        figData.y = {
+            rad2deg(xErrList(1:3,:));
+            rad2deg(xErrList(4:6, :)).*3600;
+            xErrList(7:9, :);
+            xErrList(10:12, :);
+            xErrList(13:15, :);
+        };
+        figData.sigma3s = {
+            rad2deg(sigma3List(1:3, :));
+            rad2deg(sigma3List(4:6, :)).*3600;
+            sigma3List(7:9, :);
+            sigma3List(10:12, :);
+            sigma3List(13:15, :);
+        };
+        figData.xLabel = "t (min)";
+        figData.x = t./60;
+
+        MEKF.Plot(figData)
+    end
+end
 methods(Access=protected)
     function wEst = wEstFn(o, wGyro)
         bEst = o.xEst(4:6);
@@ -64,96 +104,4 @@ methods(Access=protected)
         G = blkdiag(-o.CEst,eye(12));
     end
 end
-methods(Static)
-    function Plot(t, xErrList, sigma3List)
-        function bound = yBounds(sigVals, xVals)
-            % sets smart y limits
-            
-             % get the timestep with smallest sigma-3 bound
-            [~, minI] = min(sum(sigVals));
-
-            % get max of [sigma-3; x] at this timestep
-            % set y limits to 3 times this value
-            y = 3*(max([sigVals(:, minI); xVals(:, minI)]));
-
-            bound = [-y y];
-        end
-
-        figure;
-        tl = tiledlayout(3, 2);
-        tl.Title.String = "MEKF State Errors";
-        colororder(lines(3))
-        set(0, 'DefaultLineLineWidth', 1.4)
-        
-        nexttile([1 2])
-        vals = rad2deg(xErrList(1:3,:));
-        sigmaVals = rad2deg(sigma3List(1:3, :));
-        plot(t./60, vals)
-        grid on
-        ylabel('\delta\vartheta (deg)')
-        xlabel('t (min)')
-        hold on
-        plot(t./60, sigmaVals, ':')
-        plot(t./60, -sigmaVals, ':')
-        hold off
-        ylim(yBounds(sigmaVals, vals));
-        
-        lg = legend('x', 'y', 'z', '3-\sigma_x', '3-\sigma_y', '3-\sigma_z');
-        lg.Location = "eastoutside";
-        
-        nexttile
-        vals = rad2deg(xErrList(4:6, :)).*3600;
-        sigmaVals = rad2deg(sigma3List(4:6, :)).*3600;
-        plot(t./60, vals)
-        grid on
-        ylabel('\Delta\beta (deg/h)')
-        xlabel('t (min)')
-        hold on
-        plot(t./60, sigmaVals, ':')
-        plot(t./60, -sigmaVals, ':')
-        hold off
-        ylim(yBounds(sigmaVals, vals));
-        
-        nexttile
-        vals = xErrList(7:9, :);
-        sigmaVals = sigma3List(7:9, :);
-        plot(t./60, vals)
-        grid on
-        ylabel('\Deltas')
-        xlabel('t (min)')
-        hold on
-        plot(t./60, sigmaVals, ':')
-        plot(t./60, -sigmaVals, ':')
-        hold off
-        ylim(yBounds(sigmaVals, vals));
-        
-        nexttile
-        vals = xErrList(10:12, :);
-        sigmaVals = sigma3List(10:12, :);
-        plot(t./60, vals)
-        grid on
-        ylabel('\Deltak_U')
-        xlabel('t (min)')
-        hold on
-        plot(t./60, sigmaVals, ':')
-        plot(t./60, -sigmaVals, ':')
-        hold off
-        ylim(yBounds(sigmaVals, vals));
-        
-        nexttile
-        vals = xErrList(13:15, :);
-        sigmaVals = sigma3List(13:15, :);
-        plot(t./60, vals)
-        grid on
-        ylabel('\Deltak_L')
-        xlabel('t (min)')
-        hold on
-        plot(t./60, sigmaVals, ':')
-        plot(t./60, -sigmaVals, ':')
-        hold off
-        ylim(yBounds(sigmaVals, vals));
-    end
-end
-
-
 end

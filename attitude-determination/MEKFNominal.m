@@ -1,5 +1,5 @@
 classdef MEKFNominal < MEKF
-%MEKFNominal A 6-state MEKF involving attitude and gyro biases
+%MEKFNominal A 6-state MEKF for nominal mission
 %   mekf = MEKFNominal
 %
 %   State Vector
@@ -8,7 +8,7 @@ classdef MEKFNominal < MEKF
 %           gyro biases (3)
 %   ]
 %
-%   See the MEKF parent class for more documentation on methods
+%   See MEKF superclass for method documentation
 
 properties(Constant)
     nStates = 6;
@@ -18,11 +18,42 @@ properties
 end
 
 methods
-    % add the matrix C to initialisation
+    % calulcate the matrix C at initialisation
     function o = Initialise(o, x0, q0, P0, STrue, Q, R)
         Initialise@MEKF(o, x0, q0, P0, STrue, Q, R);
 
         o.C = eye(3) / (eye(3) + STrue);
+    end
+end
+methods(Static)
+    function Plot(t, xErrList, sigma3List)
+        %Plot Plots the state errors over time, as well as 3-sigma bounds
+        %   Plot(t, xErrList, sigma3List)
+        %   
+        %   Inputs
+        %   t           (1, :)      List of timesteps (s)
+        %   xErrList    (n, :)      List of error states
+        %   sigma3List  (n, :)      List of 3-sigma bounds
+        
+        figData.figName = "NominalMEKF";
+        figData.tlDim = [2, 1];
+        figData.plotSizes = repmat([1 1], 2, 1);
+        figData.yLabels = [
+            "\delta\vartheta (deg)"; 
+            "\Delta\beta (deg/h)"; 
+        ];
+        figData.y = {
+            rad2deg(xErrList(1:3,:));
+            rad2deg(xErrList(4:6, :)).*3600;
+        };
+        figData.sigma3s = {
+            rad2deg(sigma3List(1:3, :));
+            rad2deg(sigma3List(4:6, :)).*3600;
+        };
+        figData.xLabel = "t (min)";
+        figData.x = t./60;
+
+        MEKF.Plot(figData)
     end
 end
 methods(Access=protected)
@@ -60,46 +91,6 @@ methods(Access=protected)
             zeros(3, 6);
         ];
         G = blkdiag(-o.C, eye(3));
-    end
-end
-methods(Static)
-    function Plot(t, xErrList, sigma3List)
-        %Plot Plots the state errors over time, as well as 3-sigma bounds
-        %   Plot(t, xErrList, sigma3List)
-        %   
-        %   Inputs
-        %   t           (1, :)  List of timesteps (s)
-        %   xErrList    (n, :)  List of error states
-        %   sigma3List  (n, :)  List of 3-sigma bounds
-        
-        figure;
-        tl = tiledlayout(2, 1);
-        tl.Title.String = "MEKF State Errors";
-        colororder(lines(3))
-        set(0, 'DefaultLineLineWidth', 1.4)
-        
-        nexttile
-        plot(t./60, rad2deg(xErrList(1:3,:)))
-        grid on
-        ylabel('\delta\vartheta (deg)')
-        xlabel('t (min)')
-        hold on
-        plot(t./60, rad2deg(sigma3List(1:3, :)), ':')
-        plot(t./60, -rad2deg(sigma3List(1:3, :)), ':')
-        hold off
-        
-        lg = legend('x', 'y', 'z', '3-\sigma_x', '3-\sigma_y', '3-\sigma_z');
-        lg.Location = "eastoutside";
-        
-        nexttile
-        plot(t./60, rad2deg(xErrList(4:6, :)).*3600)
-        grid on
-        ylabel('\Delta\beta (deg/h)')
-        xlabel('t (min)')
-        hold on
-        plot(t./60, rad2deg(sigma3List(4:6, :)).*3600, ':')
-        plot(t./60, -rad2deg(sigma3List(4:6, :)).*3600, ':')
-        hold off
     end
 end
 end
