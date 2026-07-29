@@ -22,7 +22,7 @@ methods
     function o = Initialise(o, x0, q0, P0, STrue, Q, R)
         Initialise@MEKF(o, x0, q0, P0, STrue, Q, R);
 
-        o.C = inv(eye(3) + STrue);
+        o.C = eye(3) / (eye(3) + STrue);
     end
 end
 methods(Access=protected)
