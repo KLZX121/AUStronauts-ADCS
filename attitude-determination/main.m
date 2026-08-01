@@ -64,7 +64,7 @@ for i = 1:nSim
     % magnetic field reference vector
     % use dipole for initial model
     % TODO: improve with IGRF model
-    [bRef, bDotRef] = BDipole(r, jD, v); % [T, T/s]
+    bRef = BDipole(r, jD, v); % [T, T/s]
     % convert to unit vector
     uBRef = bRef./norm(bRef);
     
