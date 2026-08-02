@@ -21,7 +21,7 @@ properties(SetAccess=protected)
 
     wEst (3, 1) double
 
-    gyro struct
+    gyro GyroModel
     mag struct
 
     Q (:, :) double
@@ -49,7 +49,7 @@ methods
         %   q0      (4, 1)      Initial estimated quaternion
         %   P0      (n, n)      Initial covariance matrix
         %   Q       (n, n)      Spectral density matrix
-        %   gyro    (struct)    Gyro calibration values (GyroModel.m)
+        %   gyro    (object)    GyroModel object
         %   mag     (struct)    Magnetometer calibration values (MagModel.m)
 
         o.xEst = x0;
@@ -137,16 +137,7 @@ methods
         xSigma3 = 3*sqrt(max(diag(o.P),0));
     end
 end
-methods(Static)
-    %%% compose the calibration matrix S
-    function S = SMatrix(s, kU, kL)
-        S = [
-            s(1) kU(1) kU(2);
-            kL(1) s(2) kU(3);
-            kL(2) kL(3) s(3)
-        ];
-    end
-    
+methods(Static)    
     %%% discrete covariance propagation
     function PNew = PropPDisc(POld, F, G, Q, nStates, dt)
         A = [

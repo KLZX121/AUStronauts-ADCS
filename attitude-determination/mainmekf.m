@@ -4,20 +4,21 @@ close all;
 if isempty(which('QProd'))
     addpath(genpath('../common'));
 end
+if isempty(which('Q2Mat'))
+    addpath(genpath('../SCT/SCTAcademic'));
+end
 
 %% specs
 
-% gyro variance
-d.gyro.sigG = sqrt(10)*1e-7;
-d.gyro.sigB = sqrt(10)*1e-10;
+% gyro calibration parameters
+bias = deg2rad([0.1; 0.1; 0.1])./3600;
+s = 1e-6*[1500; 1000; 1500];
+kU = 1e-6*[1000; 1500; 2000];
+kL = 1e-6*[500; 1000; 1500];
+sigG = repmat(sqrt(10)*1e-7, 3, 1);
+sigB = repmat(sqrt(10)*1e-10, 3, 1);
 
-% gyro bias, scale factors, misalignments
-d.gyro.bias = deg2rad([0.1; 0.1; 0.1])./3600;
-d.gyro.s = 1e-6*[1500; 1000; 1500];
-d.gyro.kU = 1e-6*[1000; 1500; 2000];
-d.gyro.kL = 1e-6*[500; 1000; 1500];
-d.gyro.S = MEKF.SMatrix(d.gyro.s, d.gyro.kU, d.gyro.kL);
-
+gyro = GyroModel(bias, s, kU, kL, sigG, sigB);
 
 % magnetometer 1-sigma noise (cubemag compact)
 d.mag.sigma = repmat((120/3)*1e-9, 3, 1);
@@ -29,7 +30,6 @@ d.mag.M = eye(3) / (eye(3) + d.mag.D);
 % truth functions
 
 wTrueFn = @(t) deg2rad(10).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
-bTrueFn = @(bOld, dt) bOld + d.gyro.sigB*sqrt(dt)*randn(3, 1);
 
 %% initialise
 q0 = (sqrt(2)/2).*[1; 1; 0; 0];
@@ -40,8 +40,8 @@ P0 = blkdiag( ...
     deg2rad(6/3600)^2*eye(3), ...
     (0.2*pi/(3600*180))^2.*eye(3) ...
 );
-Q = blkdiag(d.gyro.sigG^2*eye(3), d.gyro.sigB^2*eye(3));
-mekfNom.Initialise(x0, q0, P0, Q, d.gyro, d.mag);
+Q = diag([gyro.sigG.^2; gyro.sigB.^2]);
+mekfNom.Initialise(x0, q0, P0, Q, gyro, d.mag);
 
 
 mekfCal = MEKFGyroCal;
@@ -52,8 +52,8 @@ P0C = blkdiag( ...
     (0.002/3)^2.*eye(3), ...
     (0.002/3)^2.*eye(3) ...
 );
-QC = blkdiag(d.gyro.sigG^2*eye(3), d.gyro.sigB^2*eye(3), zeros(9, 9));
-mekfCal.Initialise(x0C, q0, P0C, QC, d.gyro, d.mag);
+QC = diag([gyro.sigG.^2; gyro.sigB.^2; zeros(9, 1)]);
+mekfCal.Initialise(x0C, q0, P0C, QC, gyro, d.mag);
 
 %% simulation
 
@@ -87,21 +87,21 @@ for i = 1:nSim
     r = rOrb(:, i);
     jD = jDOrb(i);
 
-    wGyro = GyroModel(wTrue, d.gyro, dt);
+    wGyro = gyro.Measurement(wTrue, dt);
     bRef = IGRFECI(r*1e3, jD);
 
     mekfNom.Step(dt, bRef, qTrue, wGyro);
     mekfCal.Step(dt, bRef, qTrue, wGyro);
 
     % propagate
-    d.gyro.bias = bTrueFn(d.gyro.bias, dt);
+    gyro.PropagateBias(dt);
     qTrue = MEKF.PropQDisc(qTrue, wTrue, dt);
     qTrue = qTrue/norm(qTrue);
     wTrue = wTrueFn(t(i+1));
 
-    xErrList(:, i+1) = mekfNom.CalcError(qTrue, d.gyro.bias);
+    xErrList(:, i+1) = mekfNom.CalcError(qTrue, gyro.bias);
     xSigma3List(:, i+1) = mekfNom.CalcSigma3();
-    xErrListC(:, i+1) = mekfCal.CalcError(qTrue, [d.gyro.bias; d.gyro.s; d.gyro.kU; d.gyro.kL]);
+    xErrListC(:, i+1) = mekfCal.CalcError(qTrue, [gyro.bias; gyro.s; gyro.kU; gyro.kL]);
     xSigma3ListC(:, i+1) = mekfCal.CalcSigma3();
 end
 toc

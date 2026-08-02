@@ -27,7 +27,7 @@ methods(Access=protected)
         sEst = o.xEst(7:9);
         kUEst = o.xEst(10:12);
         kLEst = o.xEst(13:15);
-        SEst = MEKF.SMatrix(sEst, kUEst, kLEst);
+        SEst = GyroModel.SMatrix(sEst, kUEst, kLEst);
         o.CEst = eye(3) / (eye(3) + SEst);
 
         wEst = o.CEst*(wGyro - bEst);
