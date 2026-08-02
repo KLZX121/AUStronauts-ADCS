@@ -19,10 +19,10 @@ end
 
 methods
     % calculate the matrix C at initialisation
-    function o = Initialise(o, x0, q0, P0, STrue, Q, R)
-        Initialise@MEKF(o, x0, q0, P0, STrue, Q, R);
+    function o = Initialise(o, x0, q0, P0, Q, gyro, mag)
+        Initialise@MEKF(o, x0, q0, P0, Q, gyro, mag);
 
-        o.C = eye(3) / (eye(3) + STrue);
+        o.C = eye(3) / (eye(3) + gyro.S);
     end
 end
 methods(Access=protected)

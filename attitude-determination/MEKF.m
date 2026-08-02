@@ -21,7 +21,7 @@ properties(SetAccess=protected)
 
     wEst (3, 1) double
 
-    STrue (3, 3) double
+    gyro struct
     mag struct
 
     Q (:, :) double
@@ -40,23 +40,24 @@ methods(Abstract, Access=protected)
     [F, G] = StateMatrices(o)
 end
 methods
-    function o = Initialise(o, x0, q0, P0, STrue, Q, mag)
+    function o = Initialise(o, x0, q0, P0, Q, gyro, mag)
         %Initialise Initialises the filter with initial values
-        %   o = Initialise(o, x0, q0, P0, STrue, Q, mag)
+        %   o = Initialise(o, x0, q0, P0, Q, gyro, mag)
         %   
         %   Inputs
         %   x0      (n, 1)      Initial estimated state vector
         %   q0      (4, 1)      Initial estimated quaternion
         %   P0      (n, n)      Initial covariance matrix
-        %   STrue   (3, 3)      True gyroscope calibration matrix
         %   Q       (n, n)      Spectral density matrix
-        %   mag     (struct)    Magnetometer calibration parameters
+        %   gyro    (struct)    Gyro calibration values (GyroModel.m)
+        %   mag     (struct)    Magnetometer calibration values (MagModel.m)
 
         o.xEst = x0;
         o.qEst = q0;
         o.P = P0;
-        o.STrue = STrue;
         o.Q = Q;
+
+        o.gyro = gyro;
 
         o.R = diag(mag.sigma.^2);
         o.mag = mag;
@@ -145,11 +146,6 @@ methods(Static)
             kL(1) s(2) kU(3);
             kL(2) kL(3) s(3)
         ];
-    end
-
-    %%% gyro measurement function
-    function wGyro = GyroMeasurement(wTrue, STrue, bTrue, sig)
-        wGyro = (eye(3) + STrue)*wTrue + bTrue + sig*randn(3, 1);
     end
     
     %%% discrete covariance propagation
