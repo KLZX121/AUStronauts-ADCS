@@ -55,6 +55,8 @@ d.mag.D = zeros(3, 3);
 d.mag.O = eye(3);
 d.mag.sigma = repmat((120/3)*1e-9, 3, 1);
 
+d.mag.M = eye(3) / (eye(3) + d.mag.D);
+
 %% simulation loop
 nSim = length(tOrb);
 

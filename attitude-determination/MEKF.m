@@ -58,10 +58,9 @@ methods
         o.Q = Q;
 
         o.gyro = gyro;
+        o.mag = mag;
 
         o.R = diag(mag.sigma.^2);
-        o.mag = mag;
-        o.mag.M = eye(3) / (eye(3) + mag.D);
     end
     
     function o = Step(o, dt, bRef, q, wGyro)
@@ -104,7 +103,7 @@ methods
     end
 
     function [y, h, H] = MeasurementMatrices(o, bRef, q)
-        [y, h, H] = MagModel(bRef, q, o.mag, o.qEst, o.nStates, o.mag.M);
+        [y, h, H] = MagModel(bRef, q, o.mag, o.qEst, o.nStates);
     end
 
     function xErr = CalcError(o, qTrue, xiTrue)

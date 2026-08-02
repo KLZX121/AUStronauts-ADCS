@@ -1,4 +1,4 @@
-function [bMag, hEst, HEst] = MagModel(bRef, q, mag, qEst, nStates, M)
+function [bMag, hEst, HEst] = MagModel(bRef, q, mag, qEst, nStates)
 %MagModel Magnetometer Model
 %   bMag = MagModel(bRef, q, mag, qEst, nStates, M)
 %
@@ -15,9 +15,9 @@ function [bMag, hEst, HEst] = MagModel(bRef, q, mag, qEst, nStates, M)
 %   .bias           (3, 1)      biases
 %   .D              (3, 3)      scale factor and non-orthogonality matrix
 %   .O              (3, 3)      DCM for sensor to body frame rotation
+%   .M              (3, 3)      matrix M = inv(eye(3) + D)
 %   qEst            (4, 1)      estimated quaternion from MEKF (optional)
 %   nStates         (1, 1)      number of states in MEKF (optional)
-%   M               (3, 3)      matrix M = inv(eye(3) + D) (optional)
 %   
 %   Outputs
 %   bMag            (3, 1)      vector magnetic field measurement (T) (body frame)
@@ -28,11 +28,7 @@ A = QToDCM(q);
 
 noise = mag.sigma.*randn(3, 1);
 
-if ~(exist("M", "var")) 
-    M = eye(3) / (eye(3) + mag.D);
-end
-
-bMag = M*(mag.O'*A*bRef + mag.bias) + noise;
+bMag = mag.M*(mag.O'*A*bRef + mag.bias) + noise;
 
 % MEKF measurement functions and matrices
 if (nargin > 3)
@@ -42,7 +38,7 @@ if (nargin > 3)
     hEst = bEst;
 
     HEst = [
-        M*mag.O'*Skew(QToDCM(qEst)*bRef), ...
+        mag.M*mag.O'*Skew(QToDCM(qEst)*bRef), ...
         zeros(3, nStates-3)
     ];
 end
