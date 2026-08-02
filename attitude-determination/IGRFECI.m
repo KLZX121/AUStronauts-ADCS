@@ -2,6 +2,8 @@ function bECI = IGRFECI(rECI, jD)
 %IGRFECI Computes the IGRF magnetic field in ECI coordinates
 %   bECI = IGRFECI(rECI, jD)
 %
+%   Requires Aerospace Toolbox
+%
 %   Inputs
 %   rECI    (3, 1)  Position in the ECI frame (m)
 %   jD      (1, 1)  Julian date (UTC)

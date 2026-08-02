@@ -23,8 +23,10 @@ end
 [el, jD0] = ISSOrbit('fixed');
 
 % get pos + vel at orbital elements for one orbit (ECI)
-% [r, v] = (3, n), t = (1, n)
 [rOrb, vOrb, tOrb] = RVFromKepler(el); % [km, km/s]
+% convert to m
+rOrb = rOrb.*1e3;
+vOrb = vOrb.*1e3;
 
 %% initial state
 
@@ -38,10 +40,16 @@ q0 = GetLVLHQ(r0, v0);
 % initial state vector
 x = [r0; v0; q0];
 
+d.jD = jD0;
+d.iR = 1:3;
+d.iQ = 7:10;
+
 %% sensor models
 
-dMag = MeasMagnetometerEarth;
-dMag.quantization = 1e-20;
+d.mag.bias = zeros(3, 1);
+d.mag.D = zeros(3, 3);
+d.mag.O = eye(3);
+d.mag.sigma = repmat((120/3)*1e-9, 3, 1);
 
 %% simulation loop
 nSim = length(tOrb);
@@ -62,10 +70,7 @@ for i = 1:nSim
     %%% reference vectors (ECI)
     
     % magnetic field reference vector
-    % use dipole for initial model
-    % TODO: improve with IGRF model
-    bRef = BDipole(r, jD, v); % [T, T/s]
-    % convert to unit vector
+    bRef = IGRFECI(r, jD); % T
     uBRef = bRef./norm(bRef);
     
     % sun reference vector
@@ -75,9 +80,9 @@ for i = 1:nSim
 
     %%% sensor models (body frame)
     
-    dMag.jD = jD;
-    vBMeas = MagModel(x, dMag);
-    uBMeas = vBMeas/norm(vBMeas);
+    d.jD = jD;
+    bMag = MagModel(x, d);
+    uBMag = bMag/norm(bMag);
 
     uSMeas = CSSModel(x, uSRef);
     
@@ -86,7 +91,7 @@ for i = 1:nSim
     
     % TODO: investigate choice of first vector (see Wertz pg 425 and footnote)
     
-    ATRIAD = TRIAD([uBMeas, uSMeas], [uBRef, uSRef]);
+    ATRIAD = TRIAD([uBMag, uSMeas], [uBRef, uSRef]);
     qTRIAD = DCMToQ(ATRIAD);
 
     %%% Attitude error
@@ -105,7 +110,7 @@ end
 % TODO: visualise reference/body vectors
 PltOrbit(el, jD0);
 hold on
-plot3(rOrb(1, 1), rOrb(2, 1), rOrb(3, 1), 'or', 'MarkerSize', 10, 'LineWidth', 2)
+plot3(rOrb(1, 1)*1e-3, rOrb(2, 1)*1e-3, rOrb(3, 1)*1e-3, 'or', 'MarkerSize', 10, 'LineWidth', 2)
 hold off
 
 figure('Name', 'Estimated Attitude')
