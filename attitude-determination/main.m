@@ -4,6 +4,10 @@ clear;
 close all
 
 format longG
+set(0, 'DefaultLegendLocation', 'eastoutside')
+set(0, 'DefaultLineLineWidth', 1.4)
+set(0, 'DefaultAxesFontSize', 12)
+set(0, 'DefaultTextFontSize', 12)
 
 if isempty(which('Q2Mat'))
     addpath(genpath('../SCT/SCTAcademic'));
@@ -55,14 +59,16 @@ d.mag.sigma = repmat((120/3)*1e-9, 3, 1);
 nSim = length(tOrb);
 
 qList = zeros(4, nSim);
-thetaErrList = zeros(nSim, 1);
+thetaErrList = zeros(1, nSim);
 qErrList = zeros(4, nSim);
+bList = zeros(9, nSim);
 
 for i = 1:nSim
     %%% update state
     r = rOrb(:, i);
     v = vOrb(:, i);
     jD = jD0 + tOrb(i)/86400;
+    d.jD = jD;
 
     x = [r; v; q0;];
 
@@ -80,7 +86,6 @@ for i = 1:nSim
 
     %%% sensor models (body frame)
     
-    d.jD = jD;
     bMag = MagModel(x, d);
     uBMag = bMag/norm(bMag);
 
@@ -102,9 +107,14 @@ for i = 1:nSim
     qList(:, i) = qTRIAD;
     thetaErrList(i) = thetaErr;
     qErrList(:, i) = qErr;
+
+    bList(1:3, i) = BDipole(r.*1e-3, jD);
+    bList(4:6, i) = bRef;
+    bList(7:9, i) = QToDCM(x(d.iQ))'*bMag;
 end
 
 %% plots
+
 % visualise orbit path and positions
 % TODO: visualise ref/body frames
 % TODO: visualise reference/body vectors
@@ -114,18 +124,19 @@ plot3(rOrb(1, 1)*1e-3, rOrb(2, 1)*1e-3, rOrb(3, 1)*1e-3, 'or', 'MarkerSize', 10,
 hold off
 
 figure('Name', 'Estimated Attitude')
-plot(tOrb, qList, 'LineWidth', 1)
+plot(tOrb, qList)
 title('Estimated Quaternion')
 ylabel('q')
 xlabel('t (s)')
 legend('q_s', 'q_x', 'q_y', 'q_z')
 grid on
 
+% attitude error plots
 figure('Name', 'Attitude Error')
 tiledlayout(2, 1)
 
 nexttile
-plot(tOrb, qErrList, 'LineWidth', 1)
+plot(tOrb, qErrList)
 title('Error Quaternion')
 ylabel('q error')
 xlabel('t (s)')
@@ -134,12 +145,52 @@ ylim('padded')
 legend('q_s', 'q_x', 'q_y', 'q_z')
 
 nexttile
-plot(tOrb, rad2deg(thetaErrList), 'x-', 'MarkerSize', 8, 'LineWidth', 0.8)
+plot(tOrb, rad2deg(thetaErrList), '-', 'MarkerSize', 8)
 title('Angular Error')
 ylabel('\theta error (deg)')
 xlabel('t (s)')
 grid on
 
+% plot magnetic fields
+figure('Name', 'Magnetic Fields');
+tl = tiledlayout(3, 1);
+tl.Title.String = "Magnetic Fields (ECI)";
+tl.Title.FontWeight = "bold";
 
+nexttile
+plot(tOrb./60, bList(1, :), ':')
+hold on
+plot(tOrb./60, bList(4, :), '-')
+plot(tOrb./60, bList(7, :), 'x')
+hold off
+grid on
+xticklabels({})
+ylabel('b_x (T)')
+ylim('padded')
+
+legend('BDipole', 'IGRF', 'Mag')
+
+nexttile
+plot(tOrb./60, bList(2, :), ':')
+hold on
+plot(tOrb./60, bList(5, :), '-')
+plot(tOrb./60, bList(8, :), 'x')
+hold off
+grid on
+xticklabels({})
+ylabel('b_y (T)')
+ylim('padded')
+
+nexttile
+plot(tOrb./60, bList(3, :), ':')
+hold on
+plot(tOrb./60, bList(6, :), '-')
+plot(tOrb./60, bList(9, :), 'x')
+hold off
+grid on
+ylabel('b_z (T)')
+ylim('padded')
+
+xlabel('t (min)')
 
 %Anim2Q([repmat(q0, 1, nSim); qList;])
