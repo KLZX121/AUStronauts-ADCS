@@ -1,27 +1,50 @@
-function bMag = MagModel(x, d)
+function [bMag, hEst, HEst] = MagModel(bRef, q, mag, qEst, nStates, M)
 %MagModel Magnetometer Model
-%   bMag = MagModel(x, d)
+%   bMag = MagModel(bRef, q, mag, qEst, nStates, M)
+%
+%   Simulates magnetometer measurements, and optionally returns measurement
+%   matrices h and H for use in an MEKF when an estimated quaternion is
+%   input. This is only applicable for MEKF's that do not estimate
+%   magnetometer calibration parameters.
 %   
 %   Inputs
-%   x               (:, 1)      state vector
-%   d               (struct)    data struct
-%   .jD             (1, 1)      Julian Date of epoch
-%   .iR             (1, 3)      indices of ECI pos in state vector
-%   .iQ             (1, 4)      indices of attitude quaternion
-%   .mag.sigma      (3, 1)      1-sigma noise for each axis
-%   .mag.bias       (3, 1)      biases
-%   .mag.D          (3, 3)      scale factor and non-orthogonality matrix
-%   .mag.O          (3, 3)      DCM for sensor to body frame rotation
+%   bRef            (3, 1)      true magnetic field - use IGRFECI.m (ECI)
+%   q               (4, 1)      attitude quaternion
+%   mag             (struct)    magnetometer calibration data
+%   .sigma          (3, 1)      1-sigma noise for each axis
+%   .bias           (3, 1)      biases
+%   .D              (3, 3)      scale factor and non-orthogonality matrix
+%   .O              (3, 3)      DCM for sensor to body frame rotation
+%   qEst            (4, 1)      estimated quaternion from MEKF (optional)
+%   nStates         (1, 1)      number of states in MEKF (optional)
+%   M               (3, 3)      matrix M = inv(eye(3) + D) (optional)
 %   
 %   Outputs
-%   bMag  (3, 1)  vector magnetic field measurement (T) (body frame)
+%   bMag            (3, 1)      vector magnetic field measurement (T) (body frame)
+%   hEst            (3, 1)      estimated measurement function (optional)
+%   HEst            (3, n)      estimated measurement matrix
 
-A = QToDCM(x(d.iQ));
+A = QToDCM(q);
 
-bRef = IGRFECI(x(d.iR), d.jD);
+noise = mag.sigma.*randn(3, 1);
 
-noise = d.mag.sigma.*randn(3, 1);
+if ~(exist("M", "var")) 
+    M = eye(3) / (eye(3) + mag.D);
+end
 
-bMag = (eye(3) + d.mag.D) \ (d.mag.O'*A*bRef + d.mag.bias + noise);
+bMag = M*(mag.O'*A*bRef + mag.bias) + noise;
+
+% MEKF measurement functions and matrices
+if (nargin > 3)
+    mag.sigma = zeros(3, 1);
+    bEst = MagModel(bRef, qEst, mag);
+
+    hEst = bEst;
+
+    HEst = [
+        M*mag.O'*Skew(QToDCM(qEst)*bRef), ...
+        zeros(3, nStates-3)
+    ];
+end
 
 end

@@ -7,26 +7,25 @@ end
 
 %% specs
 
-% variance
+% gyro variance
 sigv = sqrt(10)*1e-7;
 sigu = sqrt(10)*1e-10;
 sigs = 0;
 sigU = 0;
 sigL = 0;
 
-% magnetometer 1-sigma noise (cubemag compact)
-sigmaMag = (120/3)*1e-9;
-RMag = sigmaMag^2*eye(3);
-
-% star tracker
-sigmaST = 6*pi/(180*3600);
-RST = sigmaST^2*eye(3);
-
-% bias, scale factors, misalignments
+% gyro bias, scale factors, misalignments
 bTrue0 = deg2rad([0.1; 0.1; 0.1])./3600;
 sTrue = 1e-6*[1500; 1000; 1500];
 kUTrue = 1e-6*[1000; 1500; 2000];
 kLTrue = 1e-6*[500; 1000; 1500];
+
+
+% magnetometer 1-sigma noise (cubemag compact)
+d.mag.sigma = repmat((120/3)*1e-9, 3, 1);
+d.mag.bias = zeros(3, 1);
+d.mag.D = zeros(3, 1);
+d.mag.O = eye(3);
 
 qTrue0 = (sqrt(2)/2).*[1; 1; 0; 0];
 
@@ -34,10 +33,6 @@ qTrue0 = (sqrt(2)/2).*[1; 1; 0; 0];
 
 wTrueFn = @(t) deg2rad(10).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
 bTrueFn = @(bOld, dt) bOld + sigu*sqrt(dt)*randn(3, 1);
-
-qTrue = qTrue0;
-bTrue = bTrue0;
-wTrue = wTrueFn(0);
 
 %% initialise
 
@@ -50,24 +45,24 @@ P0 = blkdiag( ...
 );
 STrue = MEKF.SMatrix(sTrue, kUTrue, kLTrue);
 Q = blkdiag(sigv^2*eye(3), sigu^2*eye(3));
-R = RMag;
-mekfNom.Initialise(x0, q0, P0, STrue, Q, R);
+mekfNom.Initialise(x0, q0, P0, STrue, Q, d.mag);
 
 
 mekfCal = MEKFGyroCal;
 x0C = zeros(15, 1);
-q0C = qTrue0;
 P0C = blkdiag( ...
-    deg2rad(6/3600)^2*eye(3), ...
-    (0.2*pi/(3600*180))^2.*eye(3), ...
+    P0, ...
     (0.002/3)^2.*eye(3), ...
     (0.002/3)^2.*eye(3), ...
     (0.002/3)^2.*eye(3) ...
 );
-STrueC = STrue;
 QC = blkdiag(sigv^2*eye(3), sigu^2*eye(3), sigs^2*eye(3), sigU^2*eye(3), sigL^2*eye(3));
-RC = RST;
-mekfCal.Initialise(x0C, q0C, P0C, STrueC, QC, RC);
+mekfCal.Initialise(x0C, q0, P0C, STrue, QC, d.mag);
+
+
+qTrue = qTrue0;
+bTrue = bTrue0;
+wTrue = wTrueFn(0);
 
 %% simulation
 
@@ -91,19 +86,19 @@ xErrListC = zeros(mekfCal.nStates, nSim+1);
 xSigma3ListC = zeros(mekfCal.nStates, nSim+1);
 xSigma3ListC(:, 1) = mekfCal.CalcSigma3();
 
-extData.sigmaMag = sigmaMag;
-extData.sigmaST = sigmaST;
+tic
 for i = 1:nSim
     wTrue = wTrueFn(t(i));
 
-    extData.jD = jDOrb(i);
-    extData.r = rOrb(:, i);
-    extData.qTrue = qTrue;
-    extData.wGyro = MEKF.GyroMeasurement(wTrue, STrue, bTrue, sigv/sqrt(dt));
+    % system state
+    r = rOrb(:, i);
+    jD = jDOrb(i);
 
+    wGyro = MEKF.GyroMeasurement(wTrue, STrue, bTrue, sigv/sqrt(dt));
+    bRef = IGRFECI(r*1e3, jD);
 
-    mekfNom.Step(dt, extData);
-    mekfCal.Step(dt, extData);
+    mekfNom.Step(dt, bRef, qTrue, wGyro);
+    mekfCal.Step(dt, bRef, qTrue, wGyro);
 
     % propagate
     bTrue = bTrueFn(bTrue, dt);
@@ -116,6 +111,7 @@ for i = 1:nSim
     xErrListC(:, i+1) = mekfCal.CalcError(qTrue, [bTrue; sTrue; kUTrue; kLTrue]);
     xSigma3ListC(:, i+1) = mekfCal.CalcSigma3();
 end
+toc
 
 mekfNom.Plot(t, xErrList, xSigma3List);
 mekfCal.Plot(t, xErrListC, xSigma3ListC);

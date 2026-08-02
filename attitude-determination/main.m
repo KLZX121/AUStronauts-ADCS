@@ -63,6 +63,7 @@ thetaErrList = zeros(1, nSim);
 qErrList = zeros(4, nSim);
 bList = zeros(9, nSim);
 
+tic
 for i = 1:nSim
     %%% update state
     r = rOrb(:, i);
@@ -86,7 +87,7 @@ for i = 1:nSim
 
     %%% sensor models (body frame)
     
-    bMag = MagModel(x, d);
+    bMag = MagModel(bRef, q0, d.mag);
     uBMag = bMag/norm(bMag);
 
     uSMeas = CSSModel(x, uSRef);
@@ -112,6 +113,7 @@ for i = 1:nSim
     bList(4:6, i) = bRef;
     bList(7:9, i) = QToDCM(x(d.iQ))'*bMag;
 end
+toc
 
 %% plots
 

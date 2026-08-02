@@ -3,7 +3,7 @@ classdef MEKFNominal < MEKF
 %   mekf = MEKFNominal
 %
 %   State Vector
-%   x (6) = [
+%   xEst (6) = [
 %           attitude error (3); 
 %           gyro biases (3)
 %   ]
@@ -18,11 +18,25 @@ properties
 end
 
 methods
-    % calulcate the matrix C at initialisation
+    % calculate the matrix C at initialisation
     function o = Initialise(o, x0, q0, P0, STrue, Q, R)
         Initialise@MEKF(o, x0, q0, P0, STrue, Q, R);
 
         o.C = eye(3) / (eye(3) + STrue);
+    end
+end
+methods(Access=protected)
+    function wEst = wEstFn(o, wGyro)
+        bEst = o.xEst(4:6);
+
+        wEst = o.C*(wGyro - bEst);
+    end
+    function [F, G] = StateMatrices(o)
+        F = [
+            -Skew(o.wEst), -o.C;
+            zeros(3, 6);
+            ];
+        G = blkdiag(-o.C, eye(3));
     end
 end
 methods(Static)
@@ -54,43 +68,6 @@ methods(Static)
         figData.x = t./60;
 
         MEKF.Plot(figData)
-    end
-end
-methods(Access=protected)
-    function wEst = wEstFn(o, wGyro)
-        bEst = o.xEst(4:6);
-        
-        wEst = o.C*(wGyro - bEst);
-    end
-    % TODO: once magnetometer model is written, use y directly from
-    % that
-    function [y, h, H] = MeasurementMatrices(o, extData)
-        dMag = MeasMagnetometerEarth;
-        dMag.jD = extData.jD;
-        dMag.kR = 1:3;
-        dMag.kQ = 4:7;
-        dMag.quantization = 1e-20;
-        x = [extData.r; extData.qTrue;];
-    
-        bMeas = MagModel(x, dMag);
-        % TODO: use our own magnetic reference function (should be done
-        % when mag model is done)
-        bEst = QToDCM(o.qEst)*BDipole(extData.r, extData.jD);
-    
-        % TODO: add sigmaMag (and sigmaSun eventually) to class
-        % properties
-        y = bMeas + extData.sigmaMag*randn(3, 1);
-    
-
-        H = [Skew(bEst) zeros(3, o.nStates-3)];
-        h = bEst;
-    end
-    function [F, G] = StateMatrices(o)
-        F = [
-            -Skew(o.wEst), -o.C;
-            zeros(3, 6);
-        ];
-        G = blkdiag(-o.C, eye(3));
     end
 end
 end
