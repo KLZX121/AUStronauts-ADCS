@@ -17,7 +17,7 @@ function P_RWA = ReactionWheelPower(T)
 
 maxTorque1U = 200e-6; % 200 mNm (Nm e-3)
 
-maxTorque3U = maxTorque1U*[1, 1, 1/3];
+maxTorque3U = maxTorque1U*[1, 1, 1];
 
 torquePerWatt = maxTorque3U/0.3; % Nm/W
 
