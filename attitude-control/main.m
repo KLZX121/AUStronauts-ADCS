@@ -48,7 +48,7 @@ d.TExt = [0 0 0]';
 % rw moi
 d.IRW = (0.6e-3)/(5600*2*pi/60);
 % rw torques
-d.TRW = [0.2e-3; 0; 0;];
+d.TRW = [0; 0; 0;];
 % indices of states in state vetor
 d.iR = 1:3;
 d.iV = 4:6;
@@ -72,14 +72,19 @@ xDotFn = @(x, t, d) [
 % TODO: write own RK4 to better suit the structure of our code
 h = 0.1;
 t0 = 0;
-tf = 60;
+tf = 100;
 t = t0:h:tf;
 
-[x, xList1] = PropState(xDotFn, x0, d, h, t0:h:(tf/2));
-d.TRW = [0; 0; 0;];
-[x, xList2] = PropState(xDotFn, x, d, h, (tf/2):h:tf);
+xList = zeros(length(x0), length(t));
+xList(:, 1) = x0;
 
-xList = [xList1 xList2(:, 2:end)];
+x = x0;
+for i = 2:length(t)
+    T_c = ControlTorque([1; 0; 0; 0], x, d);
+    d.TRW = -T_c;
+    x = PropState(xDotFn, x, d, h, t(i-1):h:t(i));
+    xList(:, i) = x;
+end
 
 %out = RK4Convergence(x0, xDotFn, d, 15);
 
