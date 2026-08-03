@@ -50,12 +50,13 @@ d.iQ = 7:10;
 
 %% sensor models
 
-d.mag.bias = zeros(3, 1);
-d.mag.D = zeros(3, 3);
-d.mag.O = eye(3);
-d.mag.sigma = repmat((120/3)*1e-9, 3, 1);
 
-d.mag.M = eye(3) / (eye(3) + d.mag.D);
+magBias = zeros(3, 1);
+magD = zeros(3, 3);
+magO = eye(3);
+magSigma = repmat((120/3)*1e-9, 3, 1);
+
+mag = MagModel(magBias, magD, magO, magSigma);
 
 %% simulation loop
 nSim = length(tOrb);
@@ -89,7 +90,7 @@ for i = 1:nSim
 
     %%% sensor models (body frame)
     
-    bMag = MagModel(bRef, q0, d.mag);
+    bMag = mag.Measurement(bRef, q0, true);
     uBMag = bMag/norm(bMag);
 
     uSMeas = CSSModel(x, uSRef);

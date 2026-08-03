@@ -11,21 +11,22 @@ end
 %% specs
 
 % gyro calibration parameters
-bias = deg2rad([0.1; 0.1; 0.1])./3600;
-s = 1e-6*[1500; 1000; 1500];
-kU = 1e-6*[1000; 1500; 2000];
-kL = 1e-6*[500; 1000; 1500];
-sigG = repmat(sqrt(10)*1e-7, 3, 1);
-sigB = repmat(sqrt(10)*1e-10, 3, 1);
+biasGyro = deg2rad([0.1; 0.1; 0.1])./3600;
+sGyro = 1e-6*[1500; 1000; 1500];
+kUGyro = 1e-6*[1000; 1500; 2000];
+kLGyro = 1e-6*[500; 1000; 1500];
+sigGGyro = repmat(sqrt(10)*1e-7, 3, 1);
+sigBGyro = repmat(sqrt(10)*1e-10, 3, 1);
 
-gyro = GyroModel(bias, s, kU, kL, sigG, sigB);
+gyro = GyroModel(biasGyro, sGyro, kUGyro, kLGyro, sigGGyro, sigBGyro);
 
 % magnetometer 1-sigma noise (cubemag compact)
-d.mag.sigma = repmat((120/3)*1e-9, 3, 1);
-d.mag.bias = zeros(3, 1);
-d.mag.D = zeros(3, 1);
-d.mag.O = eye(3);
-d.mag.M = eye(3) / (eye(3) + d.mag.D);
+biasMag = zeros(3, 1);
+DMag = zeros(3, 3);
+OMag = eye(3);
+sigmaMag = repmat((120/3)*1e-9, 3, 1);
+
+mag = MagModel(biasMag, DMag, OMag, sigmaMag);
 
 % truth functions
 
@@ -41,7 +42,7 @@ P0 = blkdiag( ...
     (0.2*pi/(3600*180))^2.*eye(3) ...
 );
 Q = diag([gyro.sigG.^2; gyro.sigB.^2]);
-mekfNom.Initialise(x0, q0, P0, Q, gyro, d.mag);
+mekfNom.Initialise(x0, q0, P0, Q, gyro, mag);
 
 
 mekfCal = MEKFGyroCal;
@@ -53,7 +54,7 @@ P0C = blkdiag( ...
     (0.002/3)^2.*eye(3) ...
 );
 QC = diag([gyro.sigG.^2; gyro.sigB.^2; zeros(9, 1)]);
-mekfCal.Initialise(x0C, q0, P0C, QC, gyro, d.mag);
+mekfCal.Initialise(x0C, q0, P0C, QC, gyro, mag);
 
 %% simulation
 

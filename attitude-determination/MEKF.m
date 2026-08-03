@@ -22,7 +22,7 @@ properties(SetAccess=protected)
     wEst (3, 1) double
 
     gyro GyroModel
-    mag struct
+    mag MagModel
 
     Q (:, :) double
     R (:, :) double
@@ -45,12 +45,12 @@ methods
         %   o = Initialise(o, x0, q0, P0, Q, gyro, mag)
         %   
         %   Inputs
-        %   x0      (n, 1)      Initial estimated state vector
-        %   q0      (4, 1)      Initial estimated quaternion
-        %   P0      (n, n)      Initial covariance matrix
-        %   Q       (n, n)      Spectral density matrix
-        %   gyro    (object)    GyroModel object
-        %   mag     (struct)    Magnetometer calibration values (MagModel.m)
+        %   x0      (n, 1)  Initial estimated state vector
+        %   q0      (4, 1)  Initial estimated quaternion
+        %   P0      (n, n)  Initial covariance matrix
+        %   Q       (n, n)  Spectral density matrix
+        %   gyro    (obj)   GyroModel object
+        %   mag     (obj)   MagModel object
 
         o.xEst = x0;
         o.qEst = q0;
@@ -103,7 +103,8 @@ methods
     end
 
     function [y, h, H] = MeasurementMatrices(o, bRef, q)
-        [y, h, H] = MagModel(bRef, q, o.mag, o.qEst, o.nStates);
+        y = o.mag.Measurement(bRef, q, true);
+        [h, H] = o.mag.MEKFMatrices(bRef, o.qEst, o.nStates);
     end
 
     function xErr = CalcError(o, qTrue, xiTrue)
