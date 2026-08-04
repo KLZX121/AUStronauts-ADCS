@@ -170,11 +170,50 @@ methods
         uS = uS./norm(uS);
     end
 
-    function [h, H] = MEKFMatrices(o, qEst, uSunRef, T, nStates)
+    function [h, H] = MEKFMatrices(o, qEst, uSunRef, T, nStates, sensorI)
+        %MEKFMatrices Calculates estimated measurements for MEKF
+        %   [h, H] = MEKFMatrices(o, qEst, uSunRef, T, nStates, sensorI)
+        %
+        %   Returns matrices for all sensors or one sensor if sensorI is
+        %   specified.
+        %
+        %   Inputs
+        %   qEst        (4, 1)  Estimated quaternion
+        %   uSunRef     (3, 1)  Unit true reference Sun vector (ECI)
+        %   T           (1, 1)  Current temperature (degC)
+        %   nStates     (1, 1)  Number of filter states
+        %   sensorI     (1, 1)  Index of sensor to get (optional)
+        %
+        %   Outputs
+        %   h           (:, 1)  Estimated measurement
+        %   H           (:, :)  Measurement sensitivity matrix
+
         h = o.Measurement(qEst, uSunRef, T, false);
 
-        H = 0;
+        uCSS = o.uSensors;
+        
+        if (nargin > 5)
+            uCSS = uCSS(:, sensorI);
+            h = h(sensorI);
+        end
+        
+        uSunEst = QToDCM(qEst)*uSunRef;
+        
+        thetaEst = acos(uCSS' * uSunEst);
 
+        dTheta = deg2rad(0.01);
+        yPlus = interp1(o.LUT(:, 1), o.LUT(:, 2), thetaEst + dTheta, 'pchip');
+        yMinus = interp1(o.LUT(:, 1), o.LUT(:, 2), thetaEst - dTheta, 'pchip');
+
+        dy = (yPlus - yMinus)/(2*dTheta);
+
+        H = -dy.*(uCSS'*Skew(uSunEst))./sin(thetaEst);
+
+        if (nargin > 5)
+            H = [H zeros(1, nStates-3)];
+        else
+            H = [H zeros(o.nSensors, nStates-3)];
+        end
     end
 end
 end
