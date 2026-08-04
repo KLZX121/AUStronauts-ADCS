@@ -108,7 +108,7 @@ for i = 1:nSim
     %%% reference vectors (ECI)
     
     % magnetic field reference vector
-    bRef = IGRFECI(r*1e3, jD); % T
+    bRef = IGRFECI(r, jD); % T
     uBRef = bRef./norm(bRef);
     
     % sun reference vector

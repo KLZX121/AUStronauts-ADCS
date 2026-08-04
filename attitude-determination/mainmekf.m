@@ -19,6 +19,8 @@ t = t0:dt:tf;
 % orbit propagation
 [el, jD0] = ISSOrbit('fixed');
 [rOrb, vOrb] = RVFromKepler(el, t);
+rOrb = rOrb.*1e3;
+vOrb = vOrb.*1e3;
 jDOrb = jD0:(dt/86400):(jD0+(tf/86400));
 
 %% specs
@@ -71,7 +73,7 @@ wTrueFn = @(t) deg2rad(10).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
 
 %% initialise
 
-bRef = IGRFECI(rOrb(:, 1)*1e3, jD0);
+bRef = IGRFECI(rOrb(:, 1), jD0);
 uBRef = bRef./norm(bRef);
 
 uSRef = SunV1(jD0, rOrb(:, 1));
@@ -131,7 +133,7 @@ for i = 1:nSim
     jD = jDOrb(i);
 
     wGyro = gyro.Measurement(wTrue, dt);
-    bRef = IGRFECI(r*1e3, jD);
+    bRef = IGRFECI(r, jD);
 
     mekfNom.Step(dt, bRef, qTrue, wGyro);
     mekfCal.Step(dt, bRef, qTrue, wGyro);
