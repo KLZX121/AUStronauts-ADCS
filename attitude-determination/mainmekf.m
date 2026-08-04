@@ -8,6 +8,19 @@ if isempty(which('Q2Mat'))
     addpath(genpath('../SCT/SCTAcademic'));
 end
 
+%%
+% simulation timeframe and timestep
+t0 = 0;
+tf = 90*60;
+dt = 1;
+nSim = (tf-t0)/dt;
+t = t0:dt:tf;
+
+% orbit propagation
+[el, jD0] = ISSOrbit('fixed');
+[rOrb, vOrb] = RVFromKepler(el, t);
+jDOrb = jD0:(dt/86400):(jD0+(tf/86400));
+
 %% specs
 
 % gyro calibration parameters
@@ -28,17 +41,60 @@ sigmaMag = repmat((120/3)*1e-9, 3, 1);
 
 mag = MagModel(biasMag, DMag, OMag, sigmaMag);
 
+% css
+nSunSensors = 6;
+uSunSensors = [eye(3) -eye(3)];
+fov = deg2rad(120);
+LUT = [
+    0 2.0737;
+    10 2.0442;
+    20 1.9592;
+    30 1.8058;
+    40 1.5854;
+    50 1.3486;
+    60 1.0999;
+    ];
+LUT(:, 1) = deg2rad(LUT(:, 1));
+sigmaSun = 0;
+sigmaTheta = deg2rad(5/3);
+yLims = [0 2.4];
+T0 = 60;
+alpha = 4.31e-3;
+
+T = 60;
+css = CSSModel(nSunSensors, uSunSensors, fov, LUT, sigmaSun, sigmaTheta, yLims, T0, alpha);
+
 % truth functions
 
+qTrue = (sqrt(2)/2).*[1; 1; 0; 0]
 wTrueFn = @(t) deg2rad(10).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
 
 %% initialise
-q0 = (sqrt(2)/2).*[1; 1; 0; 0];
+
+bRef = IGRFECI(rOrb(:, 1)*1e3, jD0);
+uBRef = bRef./norm(bRef);
+
+uSRef = SunV1(jD0, rOrb(:, 1));
+
+bMag = mag.Measurement(bRef, qTrue, true);
+uBMag = bMag/norm(bMag);
+
+ySMeas = css.Measurement(qTrue, uSRef, T, true);
+uSMeas = css.CalcSunVec(ySMeas, T);
+
+ATRIAD = TRIAD([uBMag, uSMeas], [uBRef, uSRef]);
+qTRIAD = DCMToQ(ATRIAD)
+
+q0 = qTRIAD;
+
+
+
+
 
 mekfNom = MEKFNominal;
 x0 = zeros(6, 1);
 P0 = blkdiag( ...
-    deg2rad(6/3600)^2*eye(3), ...
+    deg2rad(0.2)^2*eye(3), ...
     (0.2*pi/(3600*180))^2.*eye(3) ...
 );
 Q = diag([gyro.sigG.^2; gyro.sigB.^2]);
@@ -58,18 +114,6 @@ mekfCal.Initialise(x0C, q0, P0C, QC, gyro, mag);
 
 %% simulation
 
-% simulation timeframe and timestep
-t0 = 0;
-tf = 90*60;
-dt = 1;
-nSim = (tf-t0)/dt;
-t = t0:dt:tf;
-
-% orbit propagation
-[el, jD0] = ISSOrbit('fixed');
-[rOrb, vOrb] = RVFromKepler(el, t);
-jDOrb = jD0:(dt/86400):(jD0+(tf/86400));
-
 % data save
 xErrList = zeros(mekfNom.nStates, nSim+1);
 xSigma3List = zeros(mekfNom.nStates, nSim+1);
@@ -79,7 +123,6 @@ xErrListC = zeros(mekfCal.nStates, nSim+1);
 xSigma3ListC = zeros(mekfCal.nStates, nSim+1);
 xSigma3ListC(:, 1) = mekfCal.CalcSigma3();
 
-qTrue = q0;
 wTrue = wTrueFn(0);
 tic
 for i = 1:nSim

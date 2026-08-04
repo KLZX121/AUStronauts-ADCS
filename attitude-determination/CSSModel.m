@@ -166,5 +166,12 @@ methods
         uS = c(1:3) - c(4:6);
         uS = uS./norm(uS);
     end
+
+    function [h, H] = MEKFMatrices(o, qEst, uSunRef, T, nStates)
+        h = o.Measurement(qEst, uSunRef, T, false);
+
+        H = 0;
+
+    end
 end
 end
