@@ -44,8 +44,12 @@ q0 = GetLVLHQ(r0, v0);
 % initial state vector
 x = [r0; v0; q0];
 
+% temperature
+T = 60;
+
 d.jD = jD0;
 d.iR = 1:3;
+d.iV = 4:6;
 d.iQ = 7:10;
 
 %% sensor models
@@ -58,13 +62,36 @@ magSigma = repmat((120/3)*1e-9, 3, 1);
 
 mag = MagModel(magBias, magD, magO, magSigma);
 
+
+nSunSensors = 6;
+uSunSensors = [eye(3) -eye(3)];
+fov = deg2rad(120);
+LUT = [
+    0 2.0737;
+    10 2.0442;
+    20 1.9592;
+    30 1.8058;
+    40 1.5854;
+    50 1.3486;
+    60 1.0999;
+    ];
+LUT(:, 1) = deg2rad(LUT(:, 1));
+sigmaSun = 0;
+sigmaTheta = deg2rad(5/3);
+yLims = [0 2.4];
+T0 = 60;
+alpha = 4.31e-3;
+
+css = CSSModel(nSunSensors, uSunSensors, fov, LUT, sigmaSun, sigmaTheta, yLims, T0, alpha);
+
 %% simulation loop
 nSim = length(tOrb);
 
-qList = zeros(4, nSim);
+qList = zeros(8, nSim);
 thetaErrList = zeros(1, nSim);
 qErrList = zeros(4, nSim);
 bList = zeros(9, nSim);
+sList = zeros(6, nSim);
 
 tic
 for i = 1:nSim
@@ -85,15 +112,16 @@ for i = 1:nSim
     
     % sun reference vector
     % TODO: improve with SunV2 and compare with SunVectorECI
-    [uSRef, rSRef] = SunV1(jD, r);
+    uSRef = SunV1(jD, r);
     
 
     %%% sensor models (body frame)
     
-    bMag = mag.Measurement(bRef, q0, true);
+    bMag = mag.Measurement(bRef, x(d.iQ), true);
     uBMag = bMag/norm(bMag);
 
-    uSMeas = CSSModel(x, uSRef);
+    ySMeas = css.Measurement(x(d.iQ), uSRef, T, true);
+    uSMeas = css.CalcSunVec(ySMeas, T);
     
 
     %%% TRIAD 
@@ -108,13 +136,18 @@ for i = 1:nSim
 
 
     %%% save
-    qList(:, i) = qTRIAD;
+    qList(1:4, i) = x(d.iQ);
+    qList(5:8, i) = qTRIAD;
+
     thetaErrList(i) = thetaErr;
     qErrList(:, i) = qErr;
 
-    bList(1:3, i) = BDipole(r.*1e-3, jD);
-    bList(4:6, i) = bRef;
-    bList(7:9, i) = QToDCM(x(d.iQ))'*bMag;
+    bList(1:3, i) = QToDCM(x(d.iQ))*BDipole(r.*1e-3, jD);
+    bList(4:6, i) = QToDCM(x(d.iQ))*bRef;
+    bList(7:9, i) = bMag;
+
+    sList(1:3, i) = QToDCM(x(d.iQ))*uSRef;
+    sList(4:6, i) = uSMeas;
 end
 toc
 
@@ -128,38 +161,10 @@ hold on
 plot3(rOrb(1, 1)*1e-3, rOrb(2, 1)*1e-3, rOrb(3, 1)*1e-3, 'or', 'MarkerSize', 10, 'LineWidth', 2)
 hold off
 
-figure('Name', 'Estimated Attitude')
-plot(tOrb, qList)
-title('Estimated Quaternion')
-ylabel('q')
-xlabel('t (s)')
-legend('q_s', 'q_x', 'q_y', 'q_z')
-grid on
-
-% attitude error plots
-figure('Name', 'Attitude Error')
-tiledlayout(2, 1)
-
-nexttile
-plot(tOrb, qErrList)
-title('Error Quaternion')
-ylabel('q error')
-xlabel('t (s)')
-grid on
-ylim('padded')
-legend('q_s', 'q_x', 'q_y', 'q_z')
-
-nexttile
-plot(tOrb, rad2deg(thetaErrList), '-', 'MarkerSize', 8)
-title('Angular Error')
-ylabel('\theta error (deg)')
-xlabel('t (s)')
-grid on
-
-% plot magnetic fields
-figure('Name', 'Magnetic Fields');
+% plot magnetic measurement
+figure('Name', 'Magnetometer Measurements');
 tl = tiledlayout(3, 1);
-tl.Title.String = "Magnetic Fields (ECI)";
+tl.Title.String = "Magnetic Fields (Body)";
 tl.Title.FontWeight = "bold";
 
 nexttile
@@ -197,5 +202,78 @@ ylabel('b_z (T)')
 ylim('padded')
 
 xlabel('t (min)')
+
+% plot sun measurements
+figure('Name', 'Sun Sensor Measurements');
+tl = tiledlayout(3, 1);
+tl.Title.String = "Sun Vectors (Body)";
+tl.Title.FontWeight = "bold";
+
+nexttile
+plot(tOrb./60, sList(1, :), ':')
+hold on
+plot(tOrb./60, sList(4, :), '-')
+hold off
+grid on
+xticklabels({})
+ylabel('s_x')
+ylim('padded')
+
+legend('s_r_e_f', 's_c_s_s')
+
+nexttile
+plot(tOrb./60, sList(2, :), ':')
+hold on
+plot(tOrb./60, sList(5, :), '-')
+hold off
+grid on
+xticklabels({})
+ylabel('s_y')
+ylim('padded')
+
+nexttile
+plot(tOrb./60, sList(3, :), ':')
+hold on
+plot(tOrb./60, sList(6, :), '-')
+hold off
+grid on
+ylabel('s_z')
+ylim('padded')
+
+xlabel('t (min)')
+
+% attitude plot
+figure('Name', 'Estimated Attitude')
+plot(tOrb, qList(1:4, :), ':')
+hold on
+plot(tOrb, qList(5:8, :))
+hold off
+title('Estimated Quaternion')
+ylabel('q')
+xlabel('t (s)')
+legend('q_s', 'q_x', 'q_y', 'q_z')
+grid on
+
+% attitude error plots
+figure('Name', 'Attitude Error')
+tiledlayout(2, 1)
+
+nexttile
+plot(tOrb, qErrList)
+title('Error Quaternion')
+ylabel('q error')
+xlabel('t (s)')
+grid on
+ylim('padded')
+legend('q_s', 'q_x', 'q_y', 'q_z')
+
+nexttile
+plot(tOrb, rad2deg(thetaErrList), '-', 'MarkerSize', 8)
+title('Angular Error')
+ylabel('\theta error (deg)')
+xlabel('t (s)')
+grid on
+
+
 
 %Anim2Q([repmat(q0, 1, nSim); qList;])

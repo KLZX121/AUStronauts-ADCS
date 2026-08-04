@@ -53,7 +53,7 @@ P0C = blkdiag( ...
     (0.002/3)^2.*eye(3), ...
     (0.002/3)^2.*eye(3) ...
 );
-QC = diag([gyro.sigG.^2; gyro.sigB.^2; zeros(9, 1)]);
+QC = blkdiag(Q, zeros(9));
 mekfCal.Initialise(x0C, q0, P0C, QC, gyro, mag);
 
 %% simulation
@@ -83,7 +83,6 @@ qTrue = q0;
 wTrue = wTrueFn(0);
 tic
 for i = 1:nSim
-
     % system state
     r = rOrb(:, i);
     jD = jDOrb(i);
