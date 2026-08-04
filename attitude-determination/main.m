@@ -210,9 +210,9 @@ tl.Title.String = "Sun Vectors (Body)";
 tl.Title.FontWeight = "bold";
 
 nexttile
-plot(tOrb./60, sList(1, :), ':')
+plot(tOrb./60, sList(1, :), '-')
 hold on
-plot(tOrb./60, sList(4, :), '-')
+plot(tOrb./60, sList(4, :), 'x')
 hold off
 grid on
 xticklabels({})
@@ -222,9 +222,9 @@ ylim('padded')
 legend('s_r_e_f', 's_c_s_s')
 
 nexttile
-plot(tOrb./60, sList(2, :), ':')
+plot(tOrb./60, sList(2, :), '-')
 hold on
-plot(tOrb./60, sList(5, :), '-')
+plot(tOrb./60, sList(5, :), 'x')
 hold off
 grid on
 xticklabels({})
@@ -232,9 +232,9 @@ ylabel('s_y')
 ylim('padded')
 
 nexttile
-plot(tOrb./60, sList(3, :), ':')
+plot(tOrb./60, sList(3, :), '-')
 hold on
-plot(tOrb./60, sList(6, :), '-')
+plot(tOrb./60, sList(6, :), 'x')
 hold off
 grid on
 ylabel('s_z')
@@ -243,15 +243,17 @@ ylim('padded')
 xlabel('t (min)')
 
 % attitude plot
-figure('Name', 'Estimated Attitude')
-plot(tOrb, qList(1:4, :), ':')
+figure('Name', 'Estimated TRIAD Attitude')
+colororder(lines(4))
+
+plot(tOrb, qList(1:4, :), '-', 'DisplayName', 'q_t_r_u_e')
 hold on
-plot(tOrb, qList(5:8, :))
+plot(tOrb, qList(5:8, :), 'x','DisplayName', 'q_T_R_I_A_D')
 hold off
-title('Estimated Quaternion')
+title('Estimated Quaternion (TRIAD)')
 ylabel('q')
 xlabel('t (s)')
-legend('q_s', 'q_x', 'q_y', 'q_z')
+legend()
 grid on
 
 % attitude error plots
