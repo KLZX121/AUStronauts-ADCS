@@ -91,6 +91,7 @@ qList = zeros(8, nSim);
 thetaErrList = zeros(1, nSim);
 qErrList = zeros(4, nSim);
 bList = zeros(9, nSim);
+ySList = zeros(6, nSim);
 sList = zeros(6, nSim);
 
 tic
@@ -146,6 +147,8 @@ for i = 1:nSim
     bList(4:6, i) = QToDCM(x(d.iQ))*bRef;
     bList(7:9, i) = bMag;
 
+    ySList(:, i) = ySMeas;
+
     sList(1:3, i) = QToDCM(x(d.iQ))*uSRef;
     sList(4:6, i) = uSMeas;
 end
@@ -162,7 +165,7 @@ plot3(rOrb(1, 1)*1e-3, rOrb(2, 1)*1e-3, rOrb(3, 1)*1e-3, 'or', 'MarkerSize', 10,
 hold off
 
 % plot magnetic measurement
-figure('Name', 'Magnetometer Measurements');
+figure('Name', 'Magnetometer');
 tl = tiledlayout(3, 1);
 tl.Title.String = "Magnetic Fields (Body)";
 tl.Title.FontWeight = "bold";
@@ -204,13 +207,22 @@ ylim('padded')
 xlabel('t (min)')
 
 % plot sun measurements
-figure('Name', 'Sun Sensor Measurements');
-tl = tiledlayout(3, 1);
-tl.Title.String = "Sun Vectors (Body)";
+figure('Name', 'Sun Sensors');
+tl = tiledlayout(4, 1);
 tl.Title.FontWeight = "bold";
 
 nexttile
+plot(tOrb./60, ySList)
+title('Sun Sensor Measurements')
+grid on
+xticklabels({})
+ylabel('y_s (V)')
+ylim('padded')
+legend('+x', '+y', '+z', '-x', '-y', '-z')
+
+nexttile
 plot(tOrb./60, sList(1, :), '-')
+title("Sun Vectors (Body)")
 hold on
 plot(tOrb./60, sList(4, :), 'x')
 hold off
@@ -243,7 +255,7 @@ ylim('padded')
 xlabel('t (min)')
 
 % attitude plot
-figure('Name', 'Estimated TRIAD Attitude')
+figure('Name', 'Estimated Attitude')
 colororder(lines(4))
 
 plot(tOrb, qList(1:4, :), '-', 'DisplayName', 'q_t_r_u_e')
