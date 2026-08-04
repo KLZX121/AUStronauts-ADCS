@@ -30,13 +30,13 @@ methods
         o.M = eye(3) / (eye(3) + D);
     end
 
-    function bMag = Measurement(o, bRef, q, genNoise)
+    function bMag = Measurement(o, q, bRef, genNoise)
         %Measurement Simulates magnetometer measurements
-        %   bMag = Measurement(o, bRef, q, genNoise)
+        %   bMag = Measurement(o, q, bRef, genNoise)
         %
         %   Inputs
-        %   bRef        (3, 1)  True magnetic field in reference frame (T)
         %   q           (4, 1)  True attitude quaternion
+        %   bRef        (3, 1)  True magnetic field in reference frame (T)
         %   genNoise    (bool)  Whether to generate noise
         %
         %   Outputs
@@ -53,24 +53,24 @@ methods
         bMag = o.M*(o.O'*A*bRef + o.bias) + noise;
     end
 
-    function [h, H] = MEKFMatrices(o, bRef, qEst, nStates)
+    function [h, H] = MEKFMatrices(o, qEst, bRef, nStates)
         %MEKFMatrices Returns functions and matrices for a MEKF
-        %   [h, H] = MEKFMatrices(o, bRef, qEst, nStates)
+        %   [h, H] = MEKFMatrices(o, qEst, bRef, nStates)
         %   
         %   Returns the estimated measurement function h and measurement
         %   sensitivity matrix H, assuming the MEKF does not estimate
         %   magnetometer calibration parameters
         %
         %   Inputs
-        %   bRef        (3, 1)      Reference magnetic field (ECI)
         %   qEst        (4, 1)      Estimated attitude quaternion
+        %   bRef        (3, 1)      Reference magnetic field (ECI)
         %   nStates     (double)    Number of states in filter
         %
         %   Outputs
         %   h           (3, 1)      Estimated measurement (T)
         %   H           (3, n)      Measurement sensitivity matrix
 
-        h = o.Measurement(bRef, qEst, false);
+        h = o.Measurement(qEst, bRef, false);
 
         H = [
             o.M*o.O'*Skew(QToDCM(qEst)*bRef), ...

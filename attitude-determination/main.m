@@ -118,7 +118,7 @@ for i = 1:nSim
 
     %%% sensor models (body frame)
     
-    bMag = mag.Measurement(bRef, x(d.iQ), true);
+    bMag = mag.Measurement(x(d.iQ), bRef, true);
     uBMag = bMag/norm(bMag);
 
     ySMeas = css.Measurement(x(d.iQ), uSRef, T, true);

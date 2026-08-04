@@ -23,6 +23,7 @@ properties(SetAccess=protected)
 
     gyro GyroModel
     mag MagModel
+    css CSSModel
 
     Q (:, :) double
     R (:, :) double
@@ -40,7 +41,7 @@ methods(Abstract, Access=protected)
     [F, G] = StateMatrices(o)
 end
 methods
-    function o = Initialise(o, x0, q0, P0, Q, gyro, mag)
+    function o = Initialise(o, x0, q0, P0, Q, gyro, mag, css)
         %Initialise Initialises the filter with initial values
         %   o = Initialise(o, x0, q0, P0, Q, gyro, mag)
         %   
@@ -51,6 +52,7 @@ methods
         %   Q       (n, n)  Spectral density matrix
         %   gyro    (obj)   GyroModel object
         %   mag     (obj)   MagModel object
+        %   css     (obj)   CSSModel object
 
         o.xEst = x0;
         o.qEst = q0;
@@ -59,11 +61,13 @@ methods
 
         o.gyro = gyro;
         o.mag = mag;
+        o.css = css;
 
-        o.R = diag(mag.sigma.^2);
+        % TODO: calc R each step since it depends on number of css
+        o.R = diag([mag.sigma.^2; repmat(css.sigmaTheta.^2, 6, 1)]);
     end
     
-    function o = Step(o, dt, bRef, q, wGyro)
+    function o = Step(o, dt, q, bRef, uSRef, T, wGyro)
         %Step Steps the filter forward by one timestep
         %   o = Step(o, dt, bRef, q, wGyro)
         %   
@@ -71,15 +75,17 @@ methods
         %
         %   Inputs
         %   dt      (1, 1)      Loop timestep (s)
-        %   bRef    (3, 1)      reference magnetic field (ECI)
         %   q       (4, 1)      true attitude quaternion
+        %   bRef    (3, 1)      reference magnetic field (ECI)
+        %   uSRef   (3, 1)      Reference unit sun vector (ECI)
+        %   T       (3, 1)      Current temperature (degC)
         %   wGyro   (3, 1)      Measured gyro angular velocity (rad/s)
         %
         %   Output
         %   o       (object)    MEKF object instance
 
         % simulate measurement
-        [o.y, o.h, o.H] = o.MeasurementMatrices(bRef, q);
+        [o.y, o.h, o.H] = o.MeasurementMatrices(q, bRef, uSRef, T);
     
         % calculate gain
         o.K = o.P*o.H' / (o.H*o.P*o.H' + o.R);
@@ -102,9 +108,16 @@ methods
         o.qEst = o.PropQDisc(o.qEst, o.wEst, dt);
     end
 
-    function [y, h, H] = MeasurementMatrices(o, bRef, q)
-        y = o.mag.Measurement(bRef, q, true);
-        [h, H] = o.mag.MEKFMatrices(bRef, o.qEst, o.nStates);
+    function [y, h, H] = MeasurementMatrices(o, q, bRef, uSRef, T)
+        yMag = o.mag.Measurement(q, bRef, true);
+        [hMag, HMag] = o.mag.MEKFMatrices(o.qEst, bRef, o.nStates);
+
+        yCSS = o.css.Measurement(q, uSRef, T, true);
+        [hCSS, HCSS] = o.css.MEKFMatrices(o.qEst, uSRef, T, o.nStates);
+
+        y = [yMag; yCSS;];
+        h = [hMag; hCSS;];
+        H = [HMag; HCSS;];
     end
 
     function xErr = CalcError(o, qTrue, xiTrue)

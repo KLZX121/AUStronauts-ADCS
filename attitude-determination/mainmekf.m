@@ -68,7 +68,7 @@ css = CSSModel(nSunSensors, uSunSensors, fov, LUT, sigmaSun, sigmaTheta, yLims, 
 
 % truth functions
 
-qTrue = (sqrt(2)/2).*[1; 1; 0; 0]
+qTrue = (sqrt(2)/2).*[1; 1; 0; 0];
 wTrueFn = @(t) deg2rad(10).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
 
 %% initialise
@@ -78,14 +78,14 @@ uBRef = bRef./norm(bRef);
 
 uSRef = SunV1(jD0, rOrb(:, 1));
 
-bMag = mag.Measurement(bRef, qTrue, true);
+bMag = mag.Measurement(qTrue, bRef, true);
 uBMag = bMag/norm(bMag);
 
 ySMeas = css.Measurement(qTrue, uSRef, T, true);
 uSMeas = css.CalcSunVec(ySMeas, T);
 
 ATRIAD = TRIAD([uBMag, uSMeas], [uBRef, uSRef]);
-qTRIAD = DCMToQ(ATRIAD)
+qTRIAD = DCMToQ(ATRIAD);
 
 q0 = qTRIAD;
 
@@ -100,7 +100,7 @@ P0 = blkdiag( ...
     (0.2*pi/(3600*180))^2.*eye(3) ...
 );
 Q = diag([gyro.sigG.^2; gyro.sigB.^2]);
-mekfNom.Initialise(x0, q0, P0, Q, gyro, mag);
+mekfNom.Initialise(x0, q0, P0, Q, gyro, mag, css);
 
 
 mekfCal = MEKFGyroCal;
@@ -112,7 +112,7 @@ P0C = blkdiag( ...
     (0.002/3)^2.*eye(3) ...
 );
 QC = blkdiag(Q, zeros(9));
-mekfCal.Initialise(x0C, q0, P0C, QC, gyro, mag);
+mekfCal.Initialise(x0C, q0, P0C, QC, gyro, mag, css);
 
 %% simulation
 
@@ -135,8 +135,8 @@ for i = 1:nSim
     wGyro = gyro.Measurement(wTrue, dt);
     bRef = IGRFECI(r, jD);
 
-    mekfNom.Step(dt, bRef, qTrue, wGyro);
-    mekfCal.Step(dt, bRef, qTrue, wGyro);
+    mekfNom.Step(dt, qTrue, bRef, uSRef, T, wGyro);
+    mekfCal.Step(dt, qTrue, bRef, uSRef, T, wGyro);
 
     % propagate
     gyro.PropagateBias(dt);
