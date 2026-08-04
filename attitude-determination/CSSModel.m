@@ -71,7 +71,10 @@ methods
 
         % add angular noise
         if (genNoise)
-            trueThetas = trueThetas + o.sigmaTheta.*randn(o.nSensors, 1);
+            thetaNoise = o.sigmaTheta.*randn(o.nSensors, 1);
+            trueThetas = trueThetas + thetaNoise;
+
+            cosThetas = clip(cos(trueThetas), -1, 1);
         end
 
         thetaFov = o.fov/2;
