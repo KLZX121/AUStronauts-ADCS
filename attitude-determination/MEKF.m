@@ -64,7 +64,7 @@ methods
         o.css = css;
 
         % TODO: calc R each step since it depends on number of css
-        o.R = diag([mag.sigma.^2; repmat(css.sigmaEdge.^2, 6, 1)]);
+        o.R = diag([mag.sigma.^2; repmat(css.sigmaTheta.^2, 6, 1)]);
     end
     
     function o = Step(o, dt, q, bRef, uSRef, T, wGyro)

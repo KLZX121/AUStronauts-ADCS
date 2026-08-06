@@ -1,8 +1,9 @@
 classdef CSSModel < handle
 properties
     sigmaTheta (1, 1) double
-    sigmaEdge (1, 1) double
     sigmaDark (1, 1) double
+    sigmaYFn
+    sigmaEdge (1, 1) double
 
     nSensors (1, 1) double
     uSensors (3, :) double
@@ -50,19 +51,18 @@ methods
 
         o.nSensors = calCSS.nSensors;
         o.uSensors = calCSS.uSensors;
-        
-        o.sigmaTheta = calCSS.sigmaTheta;
-        o.sigmaEdge = calCSS.sigmaEdge;
-        o.sigmaDark = calCSS.sigmaDark;
-
-        o.fov = calCSS.fov;
-        o.thetaFov = o.fov/2;
-        o.cosFov = cos(o.thetaFov);
 
         o.yMin = calCSS.yLims(1);
         o.yMax = calCSS.yLims(2);
         o.T0 = calCSS.T0;
         o.alpha = calCSS.alpha;
+
+        o.fov = calCSS.fov;
+        o.thetaFov = o.fov/2;
+        o.cosFov = cos(o.thetaFov);
+
+        o.sigmaTheta = calCSS.sigmaTheta;
+        o.sigmaDark = calCSS.sigmaDark;
 
         % create LUT interpolation functions
         o.LUT = calCSS.LUT;
@@ -73,10 +73,14 @@ methods
 
         o.yFov = ppval(o.yFn, o.thetaFov);
 
-        % gradient interpolation used for measurement noise calculation
+        % measurement noise calculation
         grad = gradient(o.LUT(:, 2), o.LUT(:, 1));
         % y' = f'(theta)
         o.dydthetaFn = pchip(o.LUT(:, 1), grad);
+        % sigmaY function for fov measurements
+        o.sigmaYFn = @(theta) abs(ppval(o.dydthetaFn, theta)).*o.sigmaTheta;
+
+        o.sigmaEdge = o.sigmaYFn(o.thetaFov) / sin(o.thetaFov);
     end
 
     function [y, yLit] = Measurement(o, q, uSunRef, T, genNoise)
@@ -130,8 +134,7 @@ methods
 
                 % measurement noise (using datasheet angular error)
                 if (genNoise)
-                    dy = ppval(o.dydthetaFn, trueThetas(i));
-                    sigmaY(i) = o.sigmaTheta*dy;
+                    sigmaY(i) = o.sigmaYFn(trueThetas(i));
                 end
 
                 yLit(i) = 1;
@@ -146,7 +149,7 @@ methods
 
                 % measurement noise (higher than LUT)
                 if (genNoise)
-                    sigmaY(i) = amp*sin(trueThetas(i))*o.sigmaEdge;
+                    sigmaY(i) = sin(trueThetas(i))*o.sigmaEdge;
                 end
 
                 yLit(i) = 2;
