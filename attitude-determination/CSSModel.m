@@ -115,6 +115,9 @@ methods
         % get measurement including temp offset
         % TODO: add solar panel occlusion (and fgm??)
         y = zeros(o.nSensors, 1);
+        if (genNoise) 
+            sigmaY = zeros(o.nSensors, 1);
+        end
         for i = 1:o.nSensors
             if (cosThetas(i) >= o.cosFov)
                 % if sun is within fov
@@ -128,10 +131,7 @@ methods
                 % measurement noise (using datasheet angular error)
                 if (genNoise)
                     dy = ppval(o.dydthetaFn, trueThetas(i));
-                    sigmaY = o.sigmaTheta*dy;
-
-                    noiseY = sigmaY*randn;
-                    y(i) = y(i) + noiseY;
+                    sigmaY(i) = o.sigmaTheta*dy;
                 end
 
                 yLit(i) = 1;
@@ -146,10 +146,7 @@ methods
 
                 % measurement noise (higher than LUT)
                 if (genNoise)
-                    sigmaY = amp*sin(trueThetas(i))*o.sigmaEdge;
-
-                    noiseY = sigmaY*randn;
-                    y(i) = y(i) + noiseY;
+                    sigmaY(i) = amp*sin(trueThetas(i))*o.sigmaEdge;
                 end
 
                 yLit(i) = 2;
@@ -158,12 +155,16 @@ methods
                 y(i) = 0;
 
                 if (genNoise)
-                    noiseY = o.sigmaDark*randn;
-                    y(i) = y(i) + noiseY;
+                    sigmaY(i) = o.sigmaDark;
                 end
 
                 yLit(i) = 0;
             end
+        end
+
+        % add noise
+        if (genNoise)
+            y = y + sigmaY.*randn(o.nSensors, 1);
         end
 
         % clip measurement to physical y limits
