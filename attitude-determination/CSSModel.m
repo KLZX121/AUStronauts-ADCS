@@ -7,6 +7,9 @@ properties
     nSensors (1, 1) double
     uSensors (3, :) double
     fov (1, 1) double
+    thetaFov (1, 1) double
+    cosFov (1, 1) double
+    yFov (1, 1) double
 
     LUT (:, 2) double
     yFn (1, 1) struct
@@ -47,10 +50,15 @@ methods
 
         o.nSensors = calCSS.nSensors;
         o.uSensors = calCSS.uSensors;
-        o.fov = calCSS.fov;
+        
         o.sigmaTheta = calCSS.sigmaTheta;
         o.sigmaEdge = calCSS.sigmaEdge;
         o.sigmaDark = calCSS.sigmaDark;
+
+        o.fov = calCSS.fov;
+        o.thetaFov = o.fov/2;
+        o.cosFov = cos(o.thetaFov);
+
         o.yMin = calCSS.yLims(1);
         o.yMax = calCSS.yLims(2);
         o.T0 = calCSS.T0;
@@ -62,6 +70,8 @@ methods
         o.yFn = pchip(o.LUT(:, 1), o.LUT(:, 2));
         % theta = f(y)
         o.thetaFn = pchip(o.LUT(:, 2), o.LUT(:, 1));
+
+        o.yFov = ppval(o.yFn, o.thetaFov);
 
         % gradient interpolation used for measurement noise calculation
         grad = gradient(o.LUT(:, 2), o.LUT(:, 1));
@@ -95,10 +105,6 @@ methods
         % get true incidence angle      
         cosThetas = clip(o.uSensors' * uSunBody, -1, 1);
         trueThetas = acos(cosThetas);
-        
-        % get bounds for fov
-        thetaFov = o.fov/2;
-        cosFov = cos(thetaFov);
 
         % temp offset
         yTOffset = o.alpha*(T - o.T0);
@@ -110,7 +116,7 @@ methods
         % TODO: add solar panel occlusion (and fgm??)
         y = zeros(o.nSensors, 1);
         for i = 1:o.nSensors
-            if (cosThetas(i) >= cosFov)
+            if (cosThetas(i) >= o.cosFov)
                 % if sun is within fov
 
                 % use LUT and pchip interpolation
@@ -134,8 +140,7 @@ methods
 
                 % find amplitude of cosine by generating continuous
                 % curve from the fov limit of the LUT
-                yFov = ppval(o.yFn, thetaFov);
-                amp = (yFov + yTOffset) / cosFov;
+                amp = (o.yFov + yTOffset) / o.cosFov;
 
                 y(i) = amp*cosThetas(i);
 
@@ -178,13 +183,9 @@ methods
         %   Outputs
         %   uS  (3, 1)  Unit Sun vector in body frame
 
-        thetaFov = o.fov/2;
-        cosFov = cos(thetaFov);
-
         yTOffset = o.alpha*(T - o.T0);
 
-        yFov = ppval(o.yFn, thetaFov);
-        yFov = yFov + yTOffset;
+        yFovMeas = o.yFov + yTOffset;
 
         yThreshold = 3*o.sigmaDark;
 
@@ -193,7 +194,7 @@ methods
             if (y(i) <= yThreshold)
                 c(i) = 0;
 
-            elseif (y(i) > yFov)
+            elseif (y(i) > yFovMeas)
                 % measurement in fov
                 % use lut to get angle
 
@@ -207,7 +208,7 @@ methods
                 % measurement outside fov
                 % use reverse cos
                 
-                c(i) = y(i)/(yFov/cosFov);
+                c(i) = y(i)/(yFovMeas/o.cosFov);
             end
         end
         c = clip(c, 0, 1);
