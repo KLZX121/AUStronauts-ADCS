@@ -16,29 +16,69 @@ end
 
 
 
-lit = zeros(3, 2);
+
+
+n = 1000;
+nSamples = 100;
+
+lit = zeros(3,2);
+tErr = zeros(n,nSamples);
+nLitAll = zeros(n,nSamples);
+
 tic
-for i = 1:1000
-    i
-    lit = lit + run;
+for i = 1:n
+    fprintf('%d\n',i)
+
+    [l,t,nLit] = RunOrbit;
+
+    lit = lit+l;
+    tErr(i,:) = t;
+    nLitAll(i,:) = nLit;
 end
 toc
 
-% calc mean
-lit(:, 2) = lit(:, 2) ./ lit(:, 1);
-
-nRes = sum(lit, 1);
-nRes = nRes(1);
-
-% convert n to %
-lit(:, 1) = lit(:, 1) ./ nRes;
-% convert err to deg
-lit(:, 2) = rad2deg(lit(:, 2));
-
-lit
 
 
-function lit = run
+sensorCounts = [3;2;1];
+
+percentage = zeros(3,1);
+meanError = zeros(3,1);
+stdError = zeros(3,1);
+medianError = zeros(3,1);
+p95Error = zeros(3,1);
+
+for j = 1:3
+    mask = nLitAll == sensorCounts(j);
+
+    % Select every error having this number of in-FOV sensors
+    errors = rad2deg(tErr(mask));
+
+    percentage(j) = 100*nnz(mask)/numel(tErr);
+    meanError(j) = mean(errors);
+    stdError(j) = std(errors);
+    medianError(j) = median(errors);
+    p95Error(j) = prctile(errors,95);
+end
+
+results = table( ...
+    sensorCounts,percentage,meanError,stdError,medianError,p95Error, ...
+    'VariableNames',{ ...
+    'SensorsInFOV', ...
+    'Percentage', ...
+    'MeanErrorDeg', ...
+    'StdErrorDeg', ...
+    'MedianErrorDeg', ...
+    'P95ErrorDeg'});
+
+disp(results)
+
+
+
+
+
+
+
+function [lit,thetaErrList,nLitList] = RunOrbit
 
 [el, jD0] = ISSOrbit('fixed');
 
@@ -46,15 +86,12 @@ function lit = run
 el(2) = el(2) + deg2rad(10)*randn;
 
 
-% orbital parameters
-
-% get pos + vel at orbital elements for one orbit (ECI)
 [rOrb, vOrb, tOrb] = RVFromKepler(el); % [km, km/s]
 % convert to m
 rOrb = rOrb.*1e3;
 vOrb = vOrb.*1e3;
 
-% initial state
+%% initial state
 
 % initial position and velocity
 r0 = rOrb(:, 1);
@@ -77,7 +114,7 @@ d.iR = 1:3;
 d.iV = 4:6;
 d.iQ = 7:10;
 
-% sensor models
+%% sensor models
 
 
 calM.bias = zeros(3, 1);
@@ -102,6 +139,7 @@ calCSS.LUT = [
     ];
 calCSS.LUT(:, 1) = deg2rad(calCSS.LUT(:, 1));
 calCSS.sigmaTheta = deg2rad(5);
+calCSS.sigmaEdge = deg2rad(10);
 calCSS.sigmaDark = 1e-3;
 calCSS.yLims = [0 2.4];
 calCSS.T0 = 60;
@@ -109,7 +147,7 @@ calCSS.alpha = 4.31e-3;
 
 css = CSSModel(calCSS);
 
-% simulation loop
+%% simulation loop
 nSim = length(tOrb);
 
 qList = zeros(8, nSim);
@@ -201,37 +239,19 @@ end
 
 
 
+nLitList = sum(yLitList == 1,1);
 
 
 
+sensorCounts = [3;2;1];
+lit = zeros(3,2);
 
-% 3 lit fov
-indices = find(sum(yLitList == 1) == 3);
-n3Lit = length(indices);
-sumlit3 = 0;
-for i = 1:n3Lit
-   sumlit3 = sumlit3 + thetaErrList(indices(i));
+for j = 1:3
+    mask = nLitList == sensorCounts(j);
+
+    lit(j,1) = nnz(mask);
+    lit(j,2) = sum(thetaErrList(mask));
 end
 
-% 2 lit fov
-indices = find(sum(yLitList == 1) == 2);
-n2Lit = length(indices);
-sumlit2 = 0;
-for i = 1:n2Lit
-    sumlit2 = sumlit2 + thetaErrList(indices(i));
-end
 
-% 1 lit fov
-indices = find(sum(yLitList == 1) == 1);
-n1Lit = length(indices);
-sumlit1 = 0;
-for i = 1:n1Lit
-    sumlit1 = sumlit1 + thetaErrList(indices(i));
-end
-
-lit = [
-    n3Lit sumlit3;
-    n2Lit sumlit2;
-    n1Lit sumlit1;
-];
 end
