@@ -55,18 +55,18 @@ d.iQ = 7:10;
 %% sensor models
 
 
-magBias = zeros(3, 1);
-magD = zeros(3, 3);
-magO = eye(3);
-magSigma = repmat((120/3)*1e-9, 3, 1);
+calM.bias = zeros(3, 1);
+calM.D = zeros(3, 3);
+calM.O = eye(3);
+calM.sigma = repmat((120/3)*1e-9, 3, 1);
 
-mag = MagModel(magBias, magD, magO, magSigma);
+mag = MagModel(calM);
 
 
-nSunSensors = 6;
-uSunSensors = [eye(3) -eye(3)];
-fov = deg2rad(120);
-LUT = [
+calCSS.nSensors = 6;
+calCSS.uSensors = [eye(3) -eye(3)];
+calCSS.fov = deg2rad(120);
+calCSS.LUT = [
     0 2.0737;
     10 2.0442;
     20 1.9592;
@@ -75,14 +75,14 @@ LUT = [
     50 1.3486;
     60 1.0999;
     ];
-LUT(:, 1) = deg2rad(LUT(:, 1));
-sigmaSun = 0;
-sigmaTheta = deg2rad(5/3);
-yLims = [0 2.4];
-T0 = 60;
-alpha = 4.31e-3;
+calCSS.LUT(:, 1) = deg2rad(calCSS.LUT(:, 1));
+calCSS.sigma = 0;
+calCSS.sigmaTheta = deg2rad(5/3);
+calCSS.yLims = [0 2.4];
+calCSS.T0 = 60;
+calCSS.alpha = 4.31e-3;
 
-css = CSSModel(nSunSensors, uSunSensors, fov, LUT, sigmaSun, sigmaTheta, yLims, T0, alpha);
+css = CSSModel(calCSS);
 
 %% simulation loop
 nSim = length(tOrb);

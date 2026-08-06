@@ -21,30 +21,31 @@ methods(Static)
     end
 end
 methods
-    function o = GyroModel(bias, s, kU, kL, sigG, sigB)
+    function o = GyroModel(calGyro)
         %GyroModel  Models a 3-axis rate gyro
-        %   o = GyroModel(bias, s, kU, kL, sigG, sigB)
+        %   o = GyroModel(calGyro)
         %
-        %   Inputs 
-        %   bias   (3, 1)      Gyro bias (rad/s)
-        %   s      (3, 1)      Scale factors
-        %   kU     (3, 1)      Upper misalignments
-        %   kL     (3, 1)      Lower misalignments
-        %   S      (3, 3)      Scale factor/misalignment matrix
-        %   sigG   (3, 1)      1-sigma measurement noise (rad/s^(1/2))
-        %   sigB   (3, 1)      1-sigma bias walk (rad/s^(3/2))
+        %   Inputs
+        %   calGyro (struct)    Gyro Calibration parameters
+        %   .bias   (3, 1)      Gyro bias (rad/s)
+        %   .s      (3, 1)      Scale factors
+        %   .kU     (3, 1)      Upper misalignments
+        %   .kL     (3, 1)      Lower misalignments
+        %   .S      (3, 3)      Scale factor/misalignment matrix
+        %   .sigG   (3, 1)      1-sigma measurement noise (rad/s^(1/2))
+        %   .sigB   (3, 1)      1-sigma bias walk (rad/s^(3/2))
         %
         %   Outputs
         %   o      (object)    GyroModel object
 
-        o.bias = bias;
-        o.s = s;
-        o.kU = kU;
-        o.kL = kL;
-        o.sigG = sigG;
-        o.sigB = sigB;
+        o.bias = calGyro.bias;
+        o.s = calGyro.s;
+        o.kU = calGyro.kU;
+        o.kL = calGyro.kL;
+        o.sigG = calGyro.sigG;
+        o.sigB = calGyro.sigB;
 
-        o.S = o.SMatrix(s, kU, kL);
+        o.S = o.SMatrix(calGyro.s, calGyro.kU, calGyro.kL);
     end
 
     function wGyro = Measurement(o, wTrue, dt)

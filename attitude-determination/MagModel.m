@@ -9,25 +9,26 @@ properties
 end
 
 methods
-    function o = MagModel(bias, D, O, sigma)
+    function o = MagModel(calMag)
         %MagModel Models a 3-axis magnetometer
-        %   o = MagModel(bias, D, O, sigma) 
+        %   o = MagModel(calMag)
         %   
         %   Inputs
-        %   bias    (3, 1)      biases (T)
-        %   D       (3, 3)      scale factor and non-orthogonality matrix
-        %   O       (3, 3)      DCM for sensor to body frame rotation
-        %   sigma   (3, 1)      1-sigma noise for each axis (T)
+        %   calMag   (struct)    Calibration parameters
+        %   .bias    (3, 1)      Biases (T)
+        %   .D       (3, 3)      Scale factor and non-orthogonality matrix
+        %   .O       (3, 3)      DCM for sensor to body frame rotation
+        %   .sigma   (3, 1)      1-sigma noise for each axis (T)
         %   
         %   Outputs
         %   o       (object)    MagModel object       
 
-        o.bias = bias;
-        o.D = D;
-        o.O = O;
-        o.sigma = sigma;
+        o.bias = calMag.bias;
+        o.D = calMag.D;
+        o.O = calMag.O;
+        o.sigma = calMag.sigma;
         
-        o.M = eye(3) / (eye(3) + D);
+        o.M = eye(3) / (eye(3) + calMag.D);
     end
 
     function bMag = Measurement(o, q, bRef, genNoise)

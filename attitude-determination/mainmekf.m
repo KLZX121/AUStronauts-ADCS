@@ -25,29 +25,29 @@ jDOrb = jD0:(dt/86400):(jD0+(tf/86400));
 
 %% specs
 
-% gyro calibration parameters
-biasGyro = deg2rad([0.1; 0.1; 0.1])./3600;
-sGyro = 1e-6*[1500; 1000; 1500];
-kUGyro = 1e-6*[1000; 1500; 2000];
-kLGyro = 1e-6*[500; 1000; 1500];
-sigGGyro = repmat(sqrt(10)*1e-7, 3, 1);
-sigBGyro = repmat(sqrt(10)*1e-10, 3, 1);
+% gyro
+calG.bias = deg2rad([0.1; 0.1; 0.1])./3600;
+calG.s = 1e-6*[1500; 1000; 1500];
+calG.kU = 1e-6*[1000; 1500; 2000];
+calG.kL = 1e-6*[500; 1000; 1500];
+calG.sigG = repmat(sqrt(10)*1e-7, 3, 1);
+calG.sigB = repmat(sqrt(10)*1e-10, 3, 1);
 
-gyro = GyroModel(biasGyro, sGyro, kUGyro, kLGyro, sigGGyro, sigBGyro);
+gyro = GyroModel(calG);
 
-% magnetometer 1-sigma noise (cubemag compact)
-biasMag = zeros(3, 1);
-DMag = zeros(3, 3);
-OMag = eye(3);
-sigmaMag = repmat((120/3)*1e-9, 3, 1);
+% magnetometer
+calM.bias = zeros(3, 1);
+calM.D = zeros(3, 3);
+calM.O = eye(3);
+calM.sigma = repmat((120/3)*1e-9, 3, 1);
 
-mag = MagModel(biasMag, DMag, OMag, sigmaMag);
+mag = MagModel(calM);
 
 % css
-nSunSensors = 6;
-uSunSensors = [eye(3) -eye(3)];
-fov = deg2rad(120);
-LUT = [
+calCSS.nSensors = 6;
+calCSS.uSensors = [eye(3) -eye(3)];
+calCSS.fov = deg2rad(120);
+calCSS.LUT = [
     0 2.0737;
     10 2.0442;
     20 1.9592;
@@ -56,18 +56,18 @@ LUT = [
     50 1.3486;
     60 1.0999;
     ];
-LUT(:, 1) = deg2rad(LUT(:, 1));
-sigmaSun = 0;
-sigmaTheta = deg2rad(5/3);
-yLims = [0 2.4];
-T0 = 60;
-alpha = 4.31e-3;
+calCSS.LUT(:, 1) = deg2rad(calCSS.LUT(:, 1));
+calCSS.sigma = 0;
+calCSS.sigmaTheta = deg2rad(5/3);
+calCSS.yLims = [0 2.4];
+calCSS.T0 = 60;
+calCSS.alpha = 4.31e-3;
 
-T = 60;
-css = CSSModel(nSunSensors, uSunSensors, fov, LUT, sigmaSun, sigmaTheta, yLims, T0, alpha);
+css = CSSModel(calCSS);
 
 % truth functions
 
+T = 60;
 qTrue = (sqrt(2)/2).*[1; 1; 0; 0];
 wTrueFn = @(t) deg2rad(10).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
 
@@ -88,7 +88,6 @@ ATRIAD = TRIAD([uBMag, uSMeas], [uBRef, uSRef]);
 qTRIAD = DCMToQ(ATRIAD);
 
 q0 = qTRIAD;
-
 
 
 

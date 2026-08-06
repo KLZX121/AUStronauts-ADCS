@@ -18,42 +18,43 @@ properties
 end
 
 methods
-    function o = CSSModel(nSensors, uSensors, fov, LUT, sigma, sigmaTheta, yLims, T0, alpha)
+    function o = CSSModel(calCSS)
         %CSSModel Simulates a set of coarse sun sensors
-        %   o = CSSModel(nSensors, uSensors, fov, LUT, sigma, yLims, T0, alpha)
+        %   o = CSSModel(calCSS)
         %
         %   Inputs
-        %   nSensors    (1, 1)  Number of sun sensors
-        %   uSensors    (3, n)  Unit normal vectors of each sensor
-        %   fov         (1, 1)  Total field of view of sensors (rad)
-        %   LUT         (:, 2)  Look Up Table of angles (rad) in column 1
-        %                       and sensor output (V or I) in column 2
-        %   sigma       (1, 1)  1-sigma measurement noise of sensors (V or I)
-        %   sigmaTheta  (1, 1)  1-sigma angular measurement noise (rad)
-        %   yLims       (1, 2)  [yMin, yMax] which is the minimum and
-        %                       maximum possible measurement value (V or I)
-        %   T0          (1, 1)  Designated temperature of LUT (degC)
-        %   alpha       (1, 1)  Temperature coefficient (V or I) / degC
+        %   calCSS          (struct)    Calibration Parameters
+        %   .nSensors       (1, 1)      Number of sun sensors
+        %   .uSensors       (3, n)      Unit normal vectors of each sensor
+        %   .fov            (1, 1)      Total field of view of sensors (rad)
+        %   .LUT            (:, 2)      Look Up Table of angles (rad) in column 1
+        %                               and sensor output (V or I) in column 2
+        %   .sigma          (1, 1)      1-sigma measurement noise of sensors (V or I)
+        %   .sigmaTheta     (1, 1)      1-sigma angular measurement noise (rad)
+        %   .yLims          (1, 2)      [yMin, yMax] which is the minimum and
+        %                               maximum possible measurement value (V or I)
+        %   .T0             (1, 1)      Designated temperature of LUT (degC)
+        %   .alpha          (1, 1)      Temperature coefficient (V or I) / degC
         %
         %   Outputs
-        %   o           (obj)   CSSModel object
+        %   o               (obj)       CSSModel object
 
-        o.nSensors = nSensors;
-        o.uSensors = uSensors;
-        o.fov = fov;
-        o.sigma = sigma;
-        o.sigmaTheta = sigmaTheta;
-        o.yMin = yLims(1);
-        o.yMax = yLims(2);
-        o.T0 = T0;
-        o.alpha = alpha;
+        o.nSensors = calCSS.nSensors;
+        o.uSensors = calCSS.uSensors;
+        o.fov = calCSS.fov;
+        o.sigma = calCSS.sigma;
+        o.sigmaTheta = calCSS.sigmaTheta;
+        o.yMin = calCSS.yLims(1);
+        o.yMax = calCSS.yLims(2);
+        o.T0 = calCSS.T0;
+        o.alpha = calCSS.alpha;
 
         % create interpolation functions
-        o.LUT = LUT;
+        o.LUT = calCSS.LUT;
         % y = f(theta) (piecewise polynomial struct)
-        o.yFn = pchip(LUT(:, 1), LUT(:, 2));
+        o.yFn = pchip(calCSS.LUT(:, 1), calCSS.LUT(:, 2));
         % theta = f(y)
-        o.thetaFn = pchip(LUT(:, 2), LUT(:, 1));
+        o.thetaFn = pchip(calCSS.LUT(:, 2), calCSS.LUT(:, 1));
     end
 
     function y = Measurement(o, q, uSunRef, T, genNoise)
