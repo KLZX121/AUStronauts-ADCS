@@ -214,6 +214,7 @@ tl = tiledlayout(4, 1);
 tl.Title.FontWeight = "bold";
 
 nexttile
+colororder(lines(6))
 col = lines(6);
 box on
 hold on
@@ -238,7 +239,19 @@ grid on
 xticklabels({})
 ylabel('y_s (V)')
 ylim('padded')
-legend('+x', '+y', '+z', '-x', '-y', '-z')
+hold on
+legP{1} = plot(nan);
+legP{2} = plot(nan);
+legP{3} = plot(nan);
+legP{4} = plot(nan);
+legP{5} = plot(nan);
+legP{6} = plot(nan);
+
+legP{7} = plot(nan, 'o', 'Color', 'k');
+legP{8} = plot(nan, 'x', 'Color', 'k');
+legP{9} = plot(nan, '.', 'Color', 'k');
+hold off
+legend([legP{:}], {'+x', '+y', '+z', '-x', '-y', '-z', 'lit in FOV', 'lit outside FOV', 'unlit'})
 
 nexttile
 plot(tOrb./60, sList(1, :), '-')
