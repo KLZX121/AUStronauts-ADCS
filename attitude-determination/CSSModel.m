@@ -6,7 +6,10 @@ properties
     nSensors (1, 1) double
     uSensors (3, :) double
     fov (1, 1) double
+
     LUT (:, 2) double
+    yFn (1, 1) struct
+    thetaFn (1, 1) struct
 
     yMin (1, 1) double
     yMax (1, 1) double
@@ -38,13 +41,19 @@ methods
         o.nSensors = nSensors;
         o.uSensors = uSensors;
         o.fov = fov;
-        o.LUT = LUT;
         o.sigma = sigma;
         o.sigmaTheta = sigmaTheta;
         o.yMin = yLims(1);
         o.yMax = yLims(2);
         o.T0 = T0;
         o.alpha = alpha;
+
+        % create interpolation functions
+        o.LUT = LUT;
+        % y = f(theta) (piecewise polynomial struct)
+        o.yFn = pchip(LUT(:, 1), LUT(:, 2));
+        % theta = f(y)
+        o.thetaFn = pchip(LUT(:, 2), LUT(:, 1));
     end
 
     function y = Measurement(o, q, uSunRef, T, genNoise)
@@ -91,7 +100,7 @@ methods
                 % if sun is within fov
 
                 % use LUT and pchip interpolation
-                y(i) = interp1(o.LUT(:, 1), o.LUT(:, 2), trueThetas(i), 'pchip');
+                y(i) = ppval(o.yFn, trueThetas(i));
 
                 % add temperature offset
                 y(i) = y(i) + yTOffset;
@@ -100,7 +109,7 @@ methods
 
                 % find amplitude of cosine by generating continuous
                 % curve from the fov limit of the LUT
-                yFov = interp1(o.LUT(:, 1), o.LUT(:, 2), thetaFov, 'pchip');
+                yFov = ppval(o.yFn, thetaFov);
                 amp = (yFov + yTOffset) / cosFov;
 
                 y(i) = amp*cosThetas(i);
@@ -137,7 +146,7 @@ methods
 
         yTOffset = o.alpha*(T - o.T0);
 
-        yFov = interp1(o.LUT(:, 1), o.LUT(:, 2), thetaFov, 'pchip');
+        yFov = ppval(o.yFn, thetaFov);
         yFov = yFov + yTOffset;
 
         yThreshold = 3*o.sigma;
@@ -154,7 +163,7 @@ methods
                 yLUT = y(i) - yTOffset;
                 yLUT = clip(yLUT, min(o.LUT(:, 2)), max(o.LUT(:, 2)));
 
-                t = interp1(o.LUT(:, 2), o.LUT(:, 1), yLUT, 'pchip');
+                t = ppval(o.thetaFn, yLUT);
 
                 c(i) = cos(t);
             elseif (y(i) > 0)
@@ -202,8 +211,8 @@ methods
         thetaEst = acos(uCSS' * uSunEst);
 
         dTheta = deg2rad(0.01);
-        yPlus = interp1(o.LUT(:, 1), o.LUT(:, 2), thetaEst + dTheta, 'pchip');
-        yMinus = interp1(o.LUT(:, 1), o.LUT(:, 2), thetaEst - dTheta, 'pchip');
+        yPlus = ppval(o.yFn, thetaEst + dTheta);
+        yMinus = ppval(o.yFn, thetaEst - dTheta);
 
         dy = (yPlus - yMinus)/(2*dTheta);
 
