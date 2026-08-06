@@ -46,7 +46,11 @@ function lit = run
 el(2) = el(2) + deg2rad(10)*randn;
 
 
-[rOrb, vOrb, tOrb] = RVFromKepler(el);
+% orbital parameters
+
+% get pos + vel at orbital elements for one orbit (ECI)
+[rOrb, vOrb, tOrb] = RVFromKepler(el); % [km, km/s]
+% convert to m
 rOrb = rOrb.*1e3;
 vOrb = vOrb.*1e3;
 
@@ -58,6 +62,9 @@ v0 = vOrb(:, 1);
 
 % initialise attitude quaternion to LVLH (ECI -> LVLH)
 q0 = GetLVLHQ(r0, v0);
+if (q0(1) < 0)
+    q0 = q0.*-1;
+end
 
 % initial state vector
 x = [r0; v0; q0];
@@ -95,7 +102,6 @@ calCSS.LUT = [
     ];
 calCSS.LUT(:, 1) = deg2rad(calCSS.LUT(:, 1));
 calCSS.sigmaTheta = deg2rad(5);
-calCSS.sigmaEdge = deg2rad(10);
 calCSS.sigmaDark = 1e-3;
 calCSS.yLims = [0 2.4];
 calCSS.T0 = 60;

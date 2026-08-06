@@ -40,6 +40,9 @@ v0 = vOrb(:, 1);
 
 % initialise attitude quaternion to LVLH (ECI -> LVLH)
 q0 = GetLVLHQ(r0, v0);
+if (q0(1) < 0)
+    q0 = q0.*-1;
+end
 
 % initial state vector
 x = [r0; v0; q0];
@@ -77,6 +80,7 @@ calCSS.LUT = [
     ];
 calCSS.LUT(:, 1) = deg2rad(calCSS.LUT(:, 1));
 calCSS.sigmaTheta = deg2rad(5);
+calCSS.sigmaEdge = deg2rad(10);
 calCSS.sigmaDark = 1e-3;
 calCSS.yLims = [0 2.4];
 calCSS.T0 = 60;

@@ -2,8 +2,8 @@ classdef CSSModel < handle
 properties
     sigmaTheta (1, 1) double
     sigmaDark (1, 1) double
-    sigmaYFn
     sigmaEdge (1, 1) double
+    sigmaYFn
 
     nSensors (1, 1) double
     uSensors (3, :) double
@@ -62,6 +62,7 @@ methods
         o.cosFov = cos(o.thetaFov);
 
         o.sigmaTheta = calCSS.sigmaTheta;
+        o.sigmaEdge = calCSS.sigmaEdge;
         o.sigmaDark = calCSS.sigmaDark;
 
         % create LUT interpolation functions
@@ -79,8 +80,6 @@ methods
         o.dydthetaFn = pchip(o.LUT(:, 1), grad);
         % sigmaY function for fov measurements
         o.sigmaYFn = @(theta) abs(ppval(o.dydthetaFn, theta)).*o.sigmaTheta;
-
-        o.sigmaEdge = o.sigmaYFn(o.thetaFov) / sin(o.thetaFov);
     end
 
     function [y, yLit] = Measurement(o, q, uSunRef, T, genNoise)
@@ -149,7 +148,7 @@ methods
 
                 % measurement noise (higher than LUT)
                 if (genNoise)
-                    sigmaY(i) = sin(trueThetas(i))*o.sigmaEdge;
+                    sigmaY(i) = amp*sin(trueThetas(i))*o.sigmaEdge;
                 end
 
                 yLit(i) = 2;
