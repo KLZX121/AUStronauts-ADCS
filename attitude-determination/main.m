@@ -96,6 +96,10 @@ ySList = zeros(6, nSim);
 sList = zeros(6, nSim);
 yLitList = zeros(6, nSim);
 
+q = q0;
+wFn = @(t) deg2rad(10).*randn(3, 1).*sin(0.1.*randn(3, 1).*t) + deg2rad(5)*randn(3, 1);
+w = wFn(0);
+
 tic
 for i = 1:nSim
     %%% update state
@@ -104,7 +108,7 @@ for i = 1:nSim
     jD = jD0 + tOrb(i)/86400;
     d.jD = jD;
 
-    x = [r; v; q0;];
+    x = [r; v; q;];
 
 
     %%% reference vectors (ECI)
@@ -133,9 +137,12 @@ for i = 1:nSim
     
     ATRIAD = TRIAD([uBMag, uSMeas], [uBRef, uSRef]);
     qTRIAD = DCMToQ(ATRIAD);
+    if (qTRIAD(1) < 0)
+        qTRIAD = qTRIAD.*-1;
+    end
 
     %%% Attitude error
-    [thetaErr, qErr] = QAttErr(q0, qTRIAD);
+    [thetaErr, qErr] = QAttErr(q, qTRIAD);
 
 
     %%% save
@@ -154,6 +161,16 @@ for i = 1:nSim
     sList(4:6, i) = uSMeas;
 
     yLitList(:, i) = yLit;
+
+    %%% propagate
+    q = MEKF.PropQDisc(q, w, tOrb(2) - tOrb(1));
+    q = q/norm(q);
+    if (q(1) < 0)
+        q = q.*-1;
+    end
+    if (i < nSim)
+        w = wFn(tOrb(i+1));
+    end
 end
 toc
 
@@ -291,13 +308,13 @@ xlabel('t (min)')
 figure('Name', 'Estimated Attitude')
 colororder(lines(4))
 
-plot(tOrb, qList(1:4, :), '-', 'DisplayName', 'q_t_r_u_e')
+plot(tOrb./60, qList(1:4, :), '-', 'DisplayName', 'q_t_r_u_e')
 hold on
-plot(tOrb, qList(5:8, :), 'x','DisplayName', 'q_T_R_I_A_D')
+plot(tOrb./60, qList(5:8, :), 'x','DisplayName', 'q_T_R_I_A_D')
 hold off
 title('Estimated Quaternion (TRIAD)')
 ylabel('q')
-xlabel('t (s)')
+xlabel('t (min)')
 legend()
 grid on
 
@@ -306,21 +323,33 @@ figure('Name', 'Attitude Error')
 tiledlayout(2, 1)
 
 nexttile
-plot(tOrb, qErrList)
+plot(tOrb./60, qErrList)
 title('Error Quaternion')
 ylabel('q error')
-xlabel('t (s)')
+xlabel('t (min)')
 grid on
 ylim('padded')
 legend('q_s', 'q_x', 'q_y', 'q_z')
 
 nexttile
-plot(tOrb, rad2deg(thetaErrList), '-', 'MarkerSize', 8)
+plot(tOrb./60, rad2deg(thetaErrList), '-', 'MarkerSize', 8)
 title('Angular Error')
 ylabel('\theta error (deg)')
-xlabel('t (s)')
+xlabel('t (min)')
 grid on
 
-
+hold on
+indices = find(sum(yLitList == 1) == 3);
+for i = 1:length(indices)
+    xline(tOrb(indices(i))./60)
+end
+hold off
 
 %Anim2Q([repmat(q0, 1, nSim); qList;])
+
+
+
+
+
+
+

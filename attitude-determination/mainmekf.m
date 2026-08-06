@@ -57,7 +57,9 @@ calCSS.LUT = [
     60 1.0999;
     ];
 calCSS.LUT(:, 1) = deg2rad(calCSS.LUT(:, 1));
-calCSS.sigma = 0;
+calCSS.sigmaTheta = deg2rad(5);
+calCSS.sigmaEdge = deg2rad(10);
+calCSS.sigmaDark = 1e-3;
 calCSS.yLims = [0 2.4];
 calCSS.T0 = 60;
 calCSS.alpha = 4.31e-3;

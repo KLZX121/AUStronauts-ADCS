@@ -15,6 +15,11 @@ function [theta_err, q_err] = QAttErr(q_true, q_est)
 
 q_err = QProd(q_true, QConj(q_est));
 
+% keep sign consistent to prevent flips
+if (q_err(1) < 0)
+    q_err = q_err.*-1;
+end
+
 % renormalise
 q_err = q_err/norm(q_err);
 
