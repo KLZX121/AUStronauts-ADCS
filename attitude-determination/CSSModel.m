@@ -1,7 +1,8 @@
 classdef CSSModel < handle
 properties
-    sigma (1, 1) double
     sigmaTheta (1, 1) double
+    sigmaEdge (1, 1) double
+    sigmaDark (1, 1) double
 
     nSensors (1, 1) double
     uSensors (3, :) double
@@ -10,6 +11,7 @@ properties
     LUT (:, 2) double
     yFn (1, 1) struct
     thetaFn (1, 1) struct
+    dydthetaFn (1, 1) struct
 
     yMin (1, 1) double
     yMax (1, 1) double
@@ -29,8 +31,12 @@ methods
         %   .fov            (1, 1)      Total field of view of sensors (rad)
         %   .LUT            (:, 2)      Look Up Table of angles (rad) in column 1
         %                               and sensor output (V or I) in column 2
-        %   .sigma          (1, 1)      1-sigma measurement noise of sensors (V or I)
-        %   .sigmaTheta     (1, 1)      1-sigma angular measurement noise (rad)
+        %   .sigmaTheta     (1, 1)      1-sigma angular measurement noise inside 
+        %                               sensor FOV (rad)
+        %   .sigmaEdge      (1, 1)      1-sigma angular noise outside sensor FOV 
+        %                               (rad)
+        %   .sigmaDark      (1, 1)      1-sigma angular noise for unilluminated
+        %                               sensor (rad)
         %   .yLims          (1, 2)      [yMin, yMax] which is the minimum and
         %                               maximum possible measurement value (V or I)
         %   .T0             (1, 1)      Designated temperature of LUT (degC)
@@ -42,24 +48,30 @@ methods
         o.nSensors = calCSS.nSensors;
         o.uSensors = calCSS.uSensors;
         o.fov = calCSS.fov;
-        o.sigma = calCSS.sigma;
         o.sigmaTheta = calCSS.sigmaTheta;
+        o.sigmaEdge = calCSS.sigmaEdge;
+        o.sigmaDark = calCSS.sigmaDark;
         o.yMin = calCSS.yLims(1);
         o.yMax = calCSS.yLims(2);
         o.T0 = calCSS.T0;
         o.alpha = calCSS.alpha;
 
-        % create interpolation functions
+        % create LUT interpolation functions
         o.LUT = calCSS.LUT;
         % y = f(theta) (piecewise polynomial struct)
-        o.yFn = pchip(calCSS.LUT(:, 1), calCSS.LUT(:, 2));
+        o.yFn = pchip(o.LUT(:, 1), o.LUT(:, 2));
         % theta = f(y)
-        o.thetaFn = pchip(calCSS.LUT(:, 2), calCSS.LUT(:, 1));
+        o.thetaFn = pchip(o.LUT(:, 2), o.LUT(:, 1));
+
+        % gradient interpolation used for measurement noise calculation
+        grad = gradient(o.LUT(:, 2), o.LUT(:, 1));
+        % y' = f'(theta)
+        o.dydthetaFn = pchip(o.LUT(:, 1), grad);
     end
 
-    function y = Measurement(o, q, uSunRef, T, genNoise)
+    function [y, nLit] = Measurement(o, q, uSunRef, T, genNoise)
         %Measurement Simulates sun sensor measurements
-        %   y = Measurement(o, q, uSunRef, T, genNoise)
+        %   [y, nLit] = Measurement(o, q, uSunRef, T, genNoise)
         %
         %   Simulates measurements considering temperature and noise using 
         %   a LUT. Does not consider interference sources like albedo
@@ -72,28 +84,29 @@ methods
         %
         %   Outputs
         %   y           (n, 1)  Measurements of each sun sensor (V or I)
+        %   nLit        (3, 1)  Number of sensors that are lit either 1. within 
+        %                       FOV 2. outside FOV 3. not lit in the form:
+        %                       [litFOV; litEdge; unlit]
 
         % rotate sun reference vector to body frame
         uSunBody = QToDCM(q)*uSunRef;
         
+        % get true incidence angle      
         cosThetas = clip(o.uSensors' * uSunBody, -1, 1);
         trueThetas = acos(cosThetas);
-
-        % add angular noise
-        if (genNoise)
-            thetaNoise = o.sigmaTheta.*randn(o.nSensors, 1);
-            trueThetas = trueThetas + thetaNoise;
-
-            cosThetas = clip(cos(trueThetas), -1, 1);
-        end
-
+        
+        % get bounds for fov
         thetaFov = o.fov/2;
         cosFov = cos(thetaFov);
 
         % temp offset
         yTOffset = o.alpha*(T - o.T0);
 
-        % ideal measurement
+        % illuminated sensors
+        % [litInFOV, litOutFOV, unlit]
+        nLit = zeros(3, 1);
+
+        % get measurement including temp offset
         % TODO: add solar panel occlusion (and fgm??)
         y = zeros(o.nSensors, 1);
         for i = 1:o.nSensors
@@ -105,6 +118,17 @@ methods
 
                 % add temperature offset
                 y(i) = y(i) + yTOffset;
+
+                % measurement noise (using datasheet angular error)
+                if (genNoise)
+                    dy = ppval(o.dydthetaFn, trueThetas(i));
+                    sigmaY = o.sigmaTheta*dy;
+
+                    noiseY = sigmaY*randn;
+                    y(i) = y(i) + noiseY;
+                end
+
+                nLit(1) = nLit(1) + 1;
             elseif (cosThetas(i) > 0)
                 % if sun is outside fov but within 90 deg
 
@@ -114,18 +138,30 @@ methods
                 amp = (yFov + yTOffset) / cosFov;
 
                 y(i) = amp*cosThetas(i);
+
+                % measurement noise (higher than LUT)
+                if (genNoise)
+                    sigmaY = amp*sin(trueThetas(i))*o.sigmaEdge;
+
+                    noiseY = sigmaY*randn;
+                    y(i) = y(i) + noiseY;
+                end
+
+                nLit(2) = nLit(2) + 1;
             else
                 % sun is towards back-side of sensor
                 y(i) = 0;
+
+                if (genNoise)
+                    noiseY = o.sigmaDark*randn;
+                    y(i) = y(i) + noiseY;
+                end
+
+                nLit(3) = nLit(3) + 1;
             end
         end
 
-        % add measurement noise
-        if (genNoise)
-            y = y + o.sigma.*randn(o.nSensors, 1);
-        end
-
-        % clip measurement
+        % clip measurement to physical y limits
         y = clip(y, o.yMin, o.yMax);
     end
 
@@ -150,7 +186,7 @@ methods
         yFov = ppval(o.yFn, thetaFov);
         yFov = yFov + yTOffset;
 
-        yThreshold = 3*o.sigma;
+        yThreshold = 3*o.sigmaDark;
 
         c = zeros(o.nSensors, 1);
         for i = 1:o.nSensors

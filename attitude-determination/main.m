@@ -76,8 +76,9 @@ calCSS.LUT = [
     60 1.0999;
     ];
 calCSS.LUT(:, 1) = deg2rad(calCSS.LUT(:, 1));
-calCSS.sigma = 0;
-calCSS.sigmaTheta = deg2rad(5/3);
+calCSS.sigmaTheta = deg2rad(5);
+calCSS.sigmaEdge = deg2rad(10);
+calCSS.sigmaDark = 1e-3;
 calCSS.yLims = [0 2.4];
 calCSS.T0 = 60;
 calCSS.alpha = 4.31e-3;
@@ -90,9 +91,10 @@ nSim = length(tOrb);
 qList = zeros(8, nSim);
 thetaErrList = zeros(1, nSim);
 qErrList = zeros(4, nSim);
-bList = zeros(9, nSim);
+bList = zeros(6, nSim);
 ySList = zeros(6, nSim);
 sList = zeros(6, nSim);
+nLitList = zeros(3, nSim);
 
 tic
 for i = 1:nSim
@@ -121,7 +123,7 @@ for i = 1:nSim
     bMag = mag.Measurement(x(d.iQ), bRef, true);
     uBMag = bMag/norm(bMag);
 
-    ySMeas = css.Measurement(x(d.iQ), uSRef, T, true);
+    [ySMeas, nLit] = css.Measurement(x(d.iQ), uSRef, T, true);
     uSMeas = css.CalcSunVec(ySMeas, T);
     
 
@@ -143,14 +145,15 @@ for i = 1:nSim
     thetaErrList(i) = thetaErr;
     qErrList(:, i) = qErr;
 
-    bList(1:3, i) = QToDCM(x(d.iQ))*BDipole(r.*1e-3, jD);
-    bList(4:6, i) = QToDCM(x(d.iQ))*bRef;
-    bList(7:9, i) = bMag;
+    bList(1:3, i) = QToDCM(x(d.iQ))*bRef;
+    bList(4:6, i) = bMag;
 
     ySList(:, i) = ySMeas;
 
     sList(1:3, i) = QToDCM(x(d.iQ))*uSRef;
     sList(4:6, i) = uSMeas;
+
+    nLitList(:, i) = nLit;
 end
 toc
 
@@ -170,38 +173,37 @@ tl = tiledlayout(3, 1);
 tl.Title.String = "Magnetic Fields (Body)";
 tl.Title.FontWeight = "bold";
 
+bList = bList.*1e9;
+
 nexttile
-plot(tOrb./60, bList(1, :), ':')
+plot(tOrb./60, bList(1, :), '-')
 hold on
-plot(tOrb./60, bList(4, :), '-')
-plot(tOrb./60, bList(7, :), 'x')
+plot(tOrb./60, bList(4, :), 'x')
 hold off
 grid on
 xticklabels({})
-ylabel('b_x (T)')
+ylabel('b_x (nT)')
 ylim('padded')
 
-legend('BDipole', 'IGRF', 'Mag')
+legend('IGRF', 'Mag')
 
 nexttile
-plot(tOrb./60, bList(2, :), ':')
+plot(tOrb./60, bList(2, :), '-')
 hold on
-plot(tOrb./60, bList(5, :), '-')
-plot(tOrb./60, bList(8, :), 'x')
+plot(tOrb./60, bList(5, :), 'x')
 hold off
 grid on
 xticklabels({})
-ylabel('b_y (T)')
+ylabel('b_y (nT)')
 ylim('padded')
 
 nexttile
-plot(tOrb./60, bList(3, :), ':')
+plot(tOrb./60, bList(3, :), '-')
 hold on
-plot(tOrb./60, bList(6, :), '-')
-plot(tOrb./60, bList(9, :), 'x')
+plot(tOrb./60, bList(6, :), 'x')
 hold off
 grid on
-ylabel('b_z (T)')
+ylabel('b_z (nT)')
 ylim('padded')
 
 xlabel('t (min)')
