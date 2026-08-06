@@ -69,9 +69,9 @@ methods
         o.dydthetaFn = pchip(o.LUT(:, 1), grad);
     end
 
-    function [y, nLit] = Measurement(o, q, uSunRef, T, genNoise)
+    function [y, yLit] = Measurement(o, q, uSunRef, T, genNoise)
         %Measurement Simulates sun sensor measurements
-        %   [y, nLit] = Measurement(o, q, uSunRef, T, genNoise)
+        %   [y, yLit] = Measurement(o, q, uSunRef, T, genNoise)
         %
         %   Simulates measurements considering temperature and noise using 
         %   a LUT. Does not consider interference sources like albedo
@@ -84,9 +84,10 @@ methods
         %
         %   Outputs
         %   y           (n, 1)  Measurements of each sun sensor (V or I)
-        %   nLit        (3, 1)  Number of sensors that are lit either 1. within 
-        %                       FOV 2. outside FOV 3. not lit in the form:
-        %                       [litFOV; litEdge; unlit]
+        %   yLit        (n, 1)  Indicates whether sensor is:
+        %                       lit in fov = 1
+        %                       lit outside fov = 2
+        %                       unlit = 0
 
         % rotate sun reference vector to body frame
         uSunBody = QToDCM(q)*uSunRef;
@@ -102,9 +103,8 @@ methods
         % temp offset
         yTOffset = o.alpha*(T - o.T0);
 
-        % illuminated sensors
-        % [litInFOV, litOutFOV, unlit]
-        nLit = zeros(3, 1);
+        % sensor illumination status
+        yLit = zeros(6, 1);
 
         % get measurement including temp offset
         % TODO: add solar panel occlusion (and fgm??)
@@ -128,7 +128,7 @@ methods
                     y(i) = y(i) + noiseY;
                 end
 
-                nLit(1) = nLit(1) + 1;
+                yLit(i) = 1;
             elseif (cosThetas(i) > 0)
                 % if sun is outside fov but within 90 deg
 
@@ -147,7 +147,7 @@ methods
                     y(i) = y(i) + noiseY;
                 end
 
-                nLit(2) = nLit(2) + 1;
+                yLit(i) = 2;
             else
                 % sun is towards back-side of sensor
                 y(i) = 0;
@@ -157,7 +157,7 @@ methods
                     y(i) = y(i) + noiseY;
                 end
 
-                nLit(3) = nLit(3) + 1;
+                yLit(i) = 0;
             end
         end
 

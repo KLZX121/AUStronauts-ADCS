@@ -94,7 +94,7 @@ qErrList = zeros(4, nSim);
 bList = zeros(6, nSim);
 ySList = zeros(6, nSim);
 sList = zeros(6, nSim);
-nLitList = zeros(3, nSim);
+yLitList = zeros(6, nSim);
 
 tic
 for i = 1:nSim
@@ -123,7 +123,7 @@ for i = 1:nSim
     bMag = mag.Measurement(x(d.iQ), bRef, true);
     uBMag = bMag/norm(bMag);
 
-    [ySMeas, nLit] = css.Measurement(x(d.iQ), uSRef, T, true);
+    [ySMeas, yLit] = css.Measurement(x(d.iQ), uSRef, T, true);
     uSMeas = css.CalcSunVec(ySMeas, T);
     
 
@@ -153,7 +153,7 @@ for i = 1:nSim
     sList(1:3, i) = QToDCM(x(d.iQ))*uSRef;
     sList(4:6, i) = uSMeas;
 
-    nLitList(:, i) = nLit;
+    yLitList(:, i) = yLit;
 end
 toc
 
@@ -214,7 +214,25 @@ tl = tiledlayout(4, 1);
 tl.Title.FontWeight = "bold";
 
 nexttile
-plot(tOrb./60, ySList)
+col = lines(6);
+box on
+hold on
+for i = 1:nSim
+    for j = 1:css.nSensors
+        litStatus = yLitList(j, i);
+
+        if litStatus == 1 % in fov
+            spec = 'o';
+        elseif litStatus == 2 % outside fov
+            spec = 'x';
+        elseif litStatus == 0 % unlit
+            spec = '.';
+        end
+
+        plot(tOrb(i)./60, ySList(j, i), spec, 'Color', col(j, :))
+    end
+end
+hold off
 title('Sun Sensor Measurements')
 grid on
 xticklabels({})
