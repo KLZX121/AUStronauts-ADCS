@@ -100,7 +100,10 @@ sList = zeros(6, nSim);
 yLitList = zeros(6, nSim);
 
 q = q0;
-wFn = @(t) deg2rad(10).*randn(3, 1).*sin(0.1.*randn(3, 1).*t) + deg2rad(5)*randn(3, 1);
+a = deg2rad(10).*randn(3, 1);
+b = deg2rad(5).*randn(3, 1);
+c = deg2rad(5)*randn(3, 1);
+wFn = @(t) a.*sin(b.*t) + c;
 w = wFn(0);
 
 tic
@@ -164,6 +167,7 @@ for i = 1:nSim
     sList(4:6, i) = uSMeas;
 
     yLitList(:, i) = yLit;
+
 
     %%% propagate
     q = MEKF.PropQDisc(q, w, tOrb(2) - tOrb(1));
