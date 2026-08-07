@@ -11,6 +11,7 @@ properties
     thetaFov (1, 1) double
     cosFov (1, 1) double
     yFov (1, 1) double
+    sigmaYFov (1, 1) double
 
     LUT (:, 2) double
     yFn (1, 1) struct
@@ -80,6 +81,8 @@ methods
         o.dydthetaFn = pchip(o.LUT(:, 1), grad);
         % sigmaY function for fov measurements
         o.sigmaYFn = @(theta) abs(ppval(o.dydthetaFn, theta)).*o.sigmaTheta;
+
+        o.sigmaYFov = o.sigmaYFn(o.thetaFov);
     end
 
     function [y, yLit] = Measurement(o, q, uSunRef, T, genNoise)
@@ -232,7 +235,7 @@ methods
         %   uSunRef     (3, 1)  Unit true reference Sun vector (ECI)
         %   T           (1, 1)  Current temperature (degC)
         %   nStates     (1, 1)  Number of filter states
-        %   sensorI     (1, 1)  Index of sensor to get (optional)
+        %   sensorI     (:, 1)  Indices of sensor to get (optional)
         %
         %   Outputs
         %   h           (:, 1)  Estimated measurement
@@ -251,16 +254,12 @@ methods
         
         thetaEst = acos(uCSS' * uSunEst);
 
-        dTheta = deg2rad(0.01);
-        yPlus = ppval(o.yFn, thetaEst + dTheta);
-        yMinus = ppval(o.yFn, thetaEst - dTheta);
-
-        dy = (yPlus - yMinus)/(2*dTheta);
+        dy = ppval(o.dydthetaFn, thetaEst);
 
         H = -dy.*(uCSS'*Skew(uSunEst))./sin(thetaEst);
 
         if (nargin > 5)
-            H = [H zeros(1, nStates-3)];
+            H = [H zeros(length(sensorI), nStates-3)];
         else
             H = [H zeros(o.nSensors, nStates-3)];
         end

@@ -26,8 +26,8 @@ properties(SetAccess=protected)
     css CSSModel
 
     Q (:, :) double
-    R (:, :) double
 
+    R (:, :) double
     F (:, :) double
     G (:, :) double
     y (:, 1) double
@@ -62,9 +62,6 @@ methods
         o.gyro = gyro;
         o.mag = mag;
         o.css = css;
-
-        % TODO: calc R each step since it depends on number of css
-        o.R = diag([mag.sigma.^2; repmat(css.sigmaTheta.^2, 6, 1)]);
     end
     
     function o = Step(o, dt, q, bRef, uSRef, T, wGyro)
@@ -85,7 +82,7 @@ methods
         %   o       (object)    MEKF object instance
 
         % simulate measurement
-        [o.y, o.h, o.H] = o.MeasurementMatrices(q, bRef, uSRef, T);
+        [o.y, o.h, o.H, o.R] = o.MeasurementMatrices(q, bRef, uSRef, T);
     
         % calculate gain
         o.K = o.P*o.H' / (o.H*o.P*o.H' + o.R);
@@ -108,16 +105,22 @@ methods
         o.qEst = o.PropQDisc(o.qEst, o.wEst, dt);
     end
 
-    function [y, h, H] = MeasurementMatrices(o, q, bRef, uSRef, T)
+    function [y, h, H, R] = MeasurementMatrices(o, q, bRef, uSRef, T)
         yMag = o.mag.Measurement(q, bRef, true);
         [hMag, HMag] = o.mag.MEKFMatrices(o.qEst, bRef, o.nStates);
 
         yCSS = o.css.Measurement(q, uSRef, T, true);
-        [hCSS, HCSS] = o.css.MEKFMatrices(o.qEst, uSRef, T, o.nStates);
+        % filter in-fov sensors
+        inFOV = find(yCSS >= o.css.yFov);
+        yCSS = yCSS(inFOV);
+
+        [hCSS, HCSS] = o.css.MEKFMatrices(o.qEst, uSRef, T, o.nStates, inFOV);
 
         y = [yMag; yCSS;];
         h = [hMag; hCSS;];
         H = [HMag; HCSS;];
+
+        R = diag([o.mag.sigma.^2; repmat(o.css.sigmaYFov.^2, length(inFOV), 1)]);
     end
 
     function xErr = CalcError(o, qTrue, xiTrue)
