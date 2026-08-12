@@ -93,9 +93,9 @@ tic
 for i = 2:nSim
     % compute disturbances
     % TODO: rewrite our own disturbance functions since these use sct's q
-    TGrav = GravityGradientFromR(x(d.iQ), d.ISat, x(d.iR), 3.98600436e5);
+    TGrav = GravityGradientFromR(QConj(x(d.iQ)), d.ISat, x(d.iR), 3.98600436e5);
 
-    %d.TExt = TGrav;
+    d.TExt = TGrav;
 
 
     x = PropState(xDotFn, x, d, h);
