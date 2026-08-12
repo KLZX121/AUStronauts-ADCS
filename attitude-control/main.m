@@ -52,7 +52,7 @@ d.TExt = [0 0 0]';
 % rw moi
 d.IRW = (0.6e-3)/(5600*2*pi/60);
 % rw torques
-d.TRW = [0.2e-3; 0; 0;]; % N m
+d.TRW = [0; 0; 0;]; % N m
 % max rw speed
 d.maxWRW = 5600*2*pi/60; % rad/s
 
@@ -82,6 +82,9 @@ tf = 90*60;
 t = t0:h:tf;
 nSim = length(t);
 
+
+qLVLHList = zeros(4, nSim);
+qLVLHList(:, 1) = GetLVLHQ(r0, v0);
 xList = zeros(nStates, nSim);
 xList(:, 1) = x0;
 x = x0;
@@ -92,16 +95,17 @@ for i = 2:nSim
     % TODO: rewrite our own disturbance functions since these use sct's q
     TGrav = GravityGradientFromR(x(d.iQ), d.ISat, x(d.iR), 3.98600436e5);
 
-    d.TExt = TGrav;
-
-    % reaction wheel saturation (testing only - should be implemented in controller)
-    if (any(d.TRW) && any(abs(x(d.iWRW)) > d.maxWRW))
-        d.TRW = [0; 0; 0;];
-    end
+    %d.TExt = TGrav;
 
 
     x = PropState(xDotFn, x, d, h);
+
+    % renormalise quaternion
+    x(d.iQ) = x(d.iQ) ./ norm(x(d.iQ));
+
+
     xList(:, i) = x;
+    qLVLHList(:, i) = GetLVLHQ(x(d.iR), x(d.iV));
 end
 toc
 
@@ -109,6 +113,10 @@ toc
 % out = RK4Convergence(x0, xDotFn, d, 10, 6, struct("t0", t0, "tf", tf, "h0", 10));
 
 %% plot
+
+% convert time to minutes
+t = t./60;
+
 figure('Name', 'State Variables');
 tl = tiledlayout(4, 2);
 tl.Title.String = 'State Variables (ECI)';
@@ -149,24 +157,30 @@ grid on
 ylabel('\omega_r_w (rad/s)')
 ylim('padded')
 
-xlabel('t (s)')
+xlabel('t (min)')
 
 %% attitude change plots
+
 % euler axis/angle
 % convert attitude quaternion into reference with initial quaternion
 qBL = zeros(4, nSim);
 
 for i = 1:nSim
-    qBL(:, i) = QProd(xList(d.iQ, i), QConj(q0));
+    qBL(:, i) = QProd(xList(d.iQ, i), QConj(qLVLHList(:, i)));
+    % enforce sign continuity
+    if ( i >  1 && (dot(qBL(:, i), qBL(:, i-1)) < 0))
+        qBL(:, i) = -qBL(:, i);
+    end
 end
 
+% TODO: put this in a function
 qs = qBL(1, :);
 qv = qBL(2:4, :);
 eulAngle = 2*acos(min(qs, 1));
 eulAxis = qv./vecnorm(qv, 2, 1);
 
 figure('Name', 'Attitude (LVLH -> body)');
-tiledlayout(4, 1)
+tiledlayout(3, 1)
 
 nexttile
 plot(t, qBL)
@@ -188,6 +202,7 @@ ylim('padded')
 
 % euler angles (3-2-1)
 
+%{
 eulAngles = zeros(3, nSim);
 for i = 1:nSim
     % TODO: rewrite Q2Eul
@@ -199,7 +214,7 @@ plot(t, rad2deg(eulAngles))
 grid on
 legend('x', 'y', 'z')
 ylabel('euler angles (deg)')
-xlabel('t (s)')
-
+xlabel('t (min)')
+%}
 
 %AnimQ(qBL);
