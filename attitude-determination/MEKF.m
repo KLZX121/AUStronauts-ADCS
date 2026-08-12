@@ -120,7 +120,7 @@ methods
         h = [hMag; hCSS;];
         H = [HMag; HCSS;];
 
-        R = diag([o.mag.sigma.^2; repmat(o.css.sigmaYFov.^2, length(inFOV), 1)]);
+        R = blkdiag((o.mag.sigma^2).*eye(3), (o.css.sigmaYFov^2).*eye(length(inFOV)));
     end
 
     function xErr = CalcError(o, qTrue, xiTrue)

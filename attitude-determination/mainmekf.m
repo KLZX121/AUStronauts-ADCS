@@ -39,7 +39,7 @@ gyro = GyroModel(calG);
 calM.bias = zeros(3, 1);
 calM.D = zeros(3, 3);
 calM.O = eye(3);
-calM.sigma = repmat((120/3)*1e-9, 3, 1);
+calM.sigma = (120/3)*1e-9;
 
 mag = MagModel(calM);
 
@@ -85,18 +85,18 @@ uBMag = bMag/norm(bMag);
 ySMeas = css.Measurement(qTrue, uSRef, T, true);
 uSMeas = css.CalcSunVec(ySMeas, T);
 
-ATRIAD = TRIAD([uBMag, uSMeas], [uBRef, uSRef]);
+[ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma);
 qTRIAD = DCMToQ(ATRIAD);
 
 q0 = qTRIAD;
-
+PTRIADit
 
 
 
 mekfNom = MEKFNominal;
 x0 = zeros(6, 1);
 P0 = blkdiag( ...
-    deg2rad(0.2)^2*eye(3), ...
+    PTRIAD, ...
     (0.2*pi/(3600*180))^2.*eye(3) ...
 );
 Q = diag([gyro.sigG.^2; gyro.sigB.^2]);

@@ -1,6 +1,6 @@
 classdef MagModel < handle
 properties
-    sigma (3, 1)
+    sigma (1, 1)
     bias (3, 1)
     D (3, 3)
     O (3, 3)
@@ -18,7 +18,7 @@ methods
         %   .bias    (3, 1)      Biases (T)
         %   .D       (3, 3)      Scale factor and non-orthogonality matrix
         %   .O       (3, 3)      DCM for sensor to body frame rotation
-        %   .sigma   (3, 1)      1-sigma noise for each axis (T)
+        %   .sigma   (1, 1)      1-sigma noise (T)
         %   
         %   Outputs
         %   o       (object)    MagModel object       

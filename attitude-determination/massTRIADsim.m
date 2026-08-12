@@ -21,6 +21,8 @@ n = 1000;
 CSSTRIADSig(n)
 
 function CSSTRIADSig(n)
+% finds sig1 and sig2 for triad covariance
+% only considers 3-fov css measurements (since thats what mekf will use)
     tSig1 = zeros(n, 1);
     tSig2 = zeros(n, 1);
     tsigmag = zeros(n, 1);
@@ -39,14 +41,39 @@ function CSSTRIADSig(n)
     end
     toc
 
-    tSig1 = mean(tSig1);
-    tSig2 = mean(tSig2);
-    tsigmag = mean(tsigmag);
+    tSig1 = tSig1(~isnan(tSig1));
+    tSig2 = tSig2(~isnan(tSig2));
+    tsigmag = tsigmag(~isnan(tsigmag));
 
-    fprintf("sigmag: %f\n", tsigmag)
-    fprintf("sig1: %f\n", tSig1)
-    fprintf("sig2: %f\n", tSig2)
-    
+    % [sigmag, sig1, sig2,]
+    siglist = [tsigmag, tSig1, tSig2];
+
+    rmssig = zeros(3, 1);
+    meansig = zeros(3, 1);
+    stdsig = zeros(3, 1);
+    p95 = zeros(3, 1);
+    for j = 1:3
+        sig = siglist(:, j);
+
+        rmssig(j) = sqrt(mean(sig.^2));
+
+        meansig(j) = mean(sig);
+
+        
+        
+        stdsig(j) = std(sig);
+        p95(j) = prctile(sig,95);
+    end
+
+    results = table( ...
+        rmssig, meansig,stdsig,p95, ...
+        'VariableNames',{ ...
+        'RMS', ...
+        'Mean', ...
+        'Std', ...
+        'P95'},'RowNames', {'sigma_m', 'sigma_1', 'sigma_2'});
+
+    disp(results)
 
 end
 
@@ -137,7 +164,7 @@ d.iQ = 7:10;
 calM.bias = zeros(3, 1);
 calM.D = zeros(3, 3);
 calM.O = eye(3);
-calM.sigma = repmat((120/3)*1e-9, 3, 1);
+calM.sigma = (120/3)*1e-9;
 
 mag = MagModel(calM);
 
@@ -203,7 +230,7 @@ for i = 1:nSim
     [ySMeas, yLit] = css.Measurement(x(d.iQ), uSRef, T, true);
     uSMeas = css.CalcSunVec(ySMeas, T);
     
-    ATRIAD = TRIAD([uBMag, uSMeas], [uBRef, uSRef]);
+    [ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma);
     qTRIAD = DCMToQ(ATRIAD);
     if (qTRIAD(1) < 0)
         qTRIAD = qTRIAD.*-1;
@@ -212,17 +239,19 @@ for i = 1:nSim
     [thetaErr, qErr] = QAttErr(q, qTRIAD);
 
 
-    % triad sig
-    trueA = QToDCM(q);
-    uBReal = trueA*(bRef./norm(bRef));
-    uSReal = trueA*uSRef;
-    a = cross(uBReal, uSReal);
-    a = a./norm(a);
-    dvb = uBMag - uBReal;
-    dvs = uSMeas - uSReal;
-    siglist(1, i) = dot(a, dvb);
-    siglist(2, i) = dot(a, dvs);
-    siglist(3, i) = mag.sigma(1)/norm(bMag);
+    % triad sig (only get 3-fov css measurements)
+    if (sum(yLit(yLit == 1)) == 3)
+        trueA = QToDCM(q);
+        uBReal = trueA*(bRef./norm(bRef));
+        uSReal = trueA*uSRef;
+        a = cross(uBReal, uSReal);
+        a = a./norm(a);
+        dvb = uBMag - uBReal;
+        dvs = uSMeas - uSReal;
+        siglist(1, i) = abs(dot(a, dvb));
+        siglist(2, i) = abs(dot(a, dvs));
+        siglist(3, i) = mag.sigma(1)/norm(bMag);
+    end
 
 
     qList(1:4, i) = x(d.iQ);
@@ -255,6 +284,8 @@ for i = 1:nSim
 end
 
 % triad vector std test
+siglist = siglist(:, any(siglist ~= 0, 1));
+
 sig1 = sqrt(mean(siglist(1, :).^2));
 sig2 = sqrt(mean(siglist(2, :).^2));
 sigmag = mean(siglist(3, :));

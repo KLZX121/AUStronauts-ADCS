@@ -1,16 +1,18 @@
-function A = TRIAD(b, r)
+function [A, P] = TRIAD(b, r, sigmaMag)
 %TRIAD Implement the TRIAD attitude determination algorithm
-%   A = TRIAD(b, r)
+%   [A, P] = TRIAD(b, r)
 %
 %   Transforms reference -> body
 %   (src - Wertz 1978)
 %
 %   Inputs
-%   b (3,2) = [b1, b2] body frame unit vectors (sensor measurements)
-%   r (3,2) = [r1, r2] reference frame unit vectors
+%   b           (3, 2)  [b1, b2] Body frame unit vectors (sensor measurements)
+%   r           (3, 2)  [r1, r2] Reference frame unit vectors
+%   sigmaMag    (1, 1)  Magnetometer 1-sigma noise (T)
 %
 %   Outputs
-%   A     (3, 3) Attitude DCM
+%   A           (3, 3)  Attitude DCM
+%   P           (3, 3)  Covariance matrix
 
 b1 = b(:, 1);
 b2 = b(:, 2);
@@ -39,5 +41,13 @@ M_r = [v1 v2 v3];
 
 % DCM ref -> body
 A = M_b*M_r';
+
+% covariance
+sigma1 = sigmaMag/norm(b1);
+% sigma2 determined empirically through simulation
+sigma2 = 0.07;
+P = sigma1^2.*eye(3) ...
+        + (1/norm(cross(b1, b2))^2).*((sigma2^2 - sigma1^2).*b1.*b1' ...
+        + sigma1^2*dot(b1, b2).*(b1*b2' + b2*b1'));
 
 end

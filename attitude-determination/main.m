@@ -61,7 +61,7 @@ d.iQ = 7:10;
 calM.bias = zeros(3, 1);
 calM.D = zeros(3, 3);
 calM.O = eye(3);
-calM.sigma = repmat((120/3)*1e-9, 3, 1);
+calM.sigma = (120/3)*1e-9;
 
 mag = MagModel(calM);
 
@@ -141,7 +141,7 @@ for i = 1:nSim
     
     % TODO: investigate choice of first vector (see Wertz pg 425 and footnote)
     
-    ATRIAD = TRIAD([uBMag, uSMeas], [uBRef, uSRef]);
+    [ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma);
     qTRIAD = DCMToQ(ATRIAD);
     if (qTRIAD(1) < 0)
         qTRIAD = qTRIAD.*-1;
