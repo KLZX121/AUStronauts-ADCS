@@ -89,14 +89,13 @@ uSMeas = css.CalcSunVec(ySMeas, T);
 qTRIAD = DCMToQ(ATRIAD);
 
 q0 = qTRIAD;
-PTRIADit
 
 
 
 mekfNom = MEKFNominal;
 x0 = zeros(6, 1);
 P0 = blkdiag( ...
-    PTRIAD, ...
+    deg2rad(1).*eye(3), ...
     (0.2*pi/(3600*180))^2.*eye(3) ...
 );
 Q = diag([gyro.sigG.^2; gyro.sigB.^2]);
