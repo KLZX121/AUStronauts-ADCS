@@ -150,7 +150,7 @@ figure("Name", "State Vector")
 tiledlayout(2, 1)
 
 nexttile
-figA = plot(1:nTests, out.xList, '--');
+figA = loglog(1:nTests, out.xList, '--');
 grid on
 ylim padded
 ax = gca;
@@ -193,7 +193,7 @@ tiledlayout(4, 1)
 
 nexttile(2)
 title('rel error')
-figures(2, :) = plot(2:nTests, out.relErr);
+figures(2, :) = loglog(2:nTests, out.relErr);
 grid on;
 ylabel('rel error')
 xlim([1 nTests+1])
@@ -206,7 +206,7 @@ hold off
 
 nexttile(1)
 title('approx error')
-figures(1, :) = plot(2:nTests, out.approxErr);
+figures(1, :) = loglog(2:nTests, out.approxErr);
 grid on;
 ylabel('approx error')
 xlim(xl)

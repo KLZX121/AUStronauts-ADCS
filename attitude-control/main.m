@@ -120,8 +120,8 @@ for i = 2:nSim
 end
 toc
 
-
-% out = RK4Convergence(x0, xDotFn, d, 10, 6, struct("t0", t0, "tf", tf, "h0", 10));
+%d.TExt = zeros(3, 1);
+%out = RK4Convergence(x0, xDotFn, d, 8, 6, struct("t0", t0, "tf", tf, "h0", 10));
 
 %% plot
 
