@@ -230,7 +230,7 @@ for i = 1:nSim
     [ySMeas, yLit] = css.Measurement(x(d.iQ), uSRef, T, true);
     uSMeas = css.CalcSunVec(ySMeas, T);
     
-    [ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma);
+    [ATRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef]);
     qTRIAD = DCMToQ(ATRIAD);
     if (qTRIAD(1) < 0)
         qTRIAD = qTRIAD.*-1;

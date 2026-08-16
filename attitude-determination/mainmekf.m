@@ -85,7 +85,7 @@ uBMag = bMag/norm(bMag);
 ySMeas = css.Measurement(qTrue, uSRef, T, true);
 uSMeas = css.CalcSunVec(ySMeas, T);
 
-[ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma);
+[ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma/norm(bMag), 0.1);
 qTRIAD = DCMToQ(ATRIAD);
 
 q0 = qTRIAD;
@@ -95,7 +95,7 @@ q0 = qTRIAD;
 mekfNom = MEKFNominal;
 x0 = zeros(6, 1);
 P0 = blkdiag( ...
-    deg2rad(1).*eye(3), ...
+    PTRIAD, ...
     (0.2*pi/(3600*180))^2.*eye(3) ...
 );
 Q = diag([gyro.sigG.^2; gyro.sigB.^2]);

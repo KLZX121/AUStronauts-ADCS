@@ -141,7 +141,7 @@ for i = 1:nSim
     
     % TODO: investigate choice of first vector (see Wertz pg 425 and footnote)
     
-    [ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma);
+    [ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma/norm(bMag), 0.07);
     qTRIAD = DCMToQ(ATRIAD);
     if (qTRIAD(1) < 0)
         qTRIAD = qTRIAD.*-1;
