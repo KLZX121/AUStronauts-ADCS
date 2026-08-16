@@ -6,6 +6,8 @@ close all;
 format longG
 set(0, 'DefaultLegendLocation', 'eastoutside')
 set(0, 'DefaultLineLineWidth', 1.4)
+set(0, 'DefaultAxesFontSize', 12)
+set(0, 'DefaultTextFontSize', 12)
 
 if isempty(which('Q2Mat'))
     addpath(genpath('../SCT/SCTAcademic'));
@@ -17,6 +19,7 @@ end
 %% initial states
 
 % orbital elements to find initial pos and vel
+% TODO: switch to using meters and rewrite relevant functions
 [el, jD0] = ISSOrbit('fixed');
 [r0, v0] = El2RV(el); % [km, km/s]
 
@@ -87,6 +90,8 @@ qLVLHList = zeros(4, nSim);
 qLVLHList(:, 1) = GetLVLHQ(r0, v0);
 xList = zeros(nStates, nSim);
 xList(:, 1) = x0;
+distList = zeros(12, nSim); % [Tg; Ta; Ts; Tm]
+
 x = x0;
 
 tic
@@ -95,7 +100,12 @@ for i = 2:nSim
     % TODO: rewrite our own disturbance functions since these use sct's q
     TGrav = GravityGradientFromR(QConj(x(d.iQ)), d.ISat, x(d.iR), 3.98600436e5);
 
-    d.TExt = TGrav;
+    jD = jD0 + t(i)/86400;
+    s = SunV1(jD, x(d.iR));
+    B = BDipole(x(d.iR), jD);
+    [Tg, Ta, Ts, Tm] = DisturbanceTorques(x, d, s, B);
+
+    d.TExt = Tg + Ta + Ts + Tm;
 
 
     x = PropState(xDotFn, x, d, h);
@@ -106,6 +116,7 @@ for i = 2:nSim
 
     xList(:, i) = x;
     qLVLHList(:, i) = GetLVLHQ(x(d.iR), x(d.iV));
+    distList(:, i) = [Tg; Ta; Ts; Tm];
 end
 toc
 
@@ -126,14 +137,14 @@ nexttile
 plot(t, xList(d.iR, :))
 legend('r_x', 'r_y', 'r_z')
 grid on
-ylabel('r (m)')
+ylabel('r (km)')
 ylim('padded')
 
 nexttile
 plot(t, xList(d.iV, :))
 legend('v_x', 'v_y', 'v_z')
 grid on
-ylabel('v (m/s)')
+ylabel('v (km/s)')
 ylim('padded')
 
 nexttile([2 1])
@@ -218,3 +229,33 @@ xlabel('t (min)')
 %}
 
 %AnimQ(qBL);
+
+%% disturbance plots
+
+figure('Name', 'Disturbance Torques (Body)')
+tiledlayout(4, 1)
+
+nexttile
+plot(t, distList(1:3, :))
+title('Gravity Gradient')
+ylabel('T_g (N m)')
+
+legend('x', 'y', 'z')
+
+nexttile
+plot(t, distList(4:6, :))
+title('Aerodynamic Drag')
+ylabel('T_a (N m)')
+
+nexttile
+plot(t, distList(7:9, :))
+title('SRP')
+ylabel('T_s (N m)')
+
+nexttile
+plot(t, distList(10:12, :))
+title('Magnetic Field')
+ylabel('T_m (N m)')
+xlabel('t (min)')
+
+
