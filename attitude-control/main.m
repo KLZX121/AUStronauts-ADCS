@@ -6,6 +6,8 @@ close all;
 format longG
 set(0, 'DefaultLegendLocation', 'eastoutside')
 set(0, 'DefaultLineLineWidth', 1.4)
+set(0, 'DefaultAxesFontSize', 12)
+set(0, 'DefaultTextFontSize', 12)
 
 if isempty(which('Q2Mat'))
     addpath(genpath('../SCT/SCTAcademic'));
@@ -17,6 +19,7 @@ end
 %% initial states
 
 % orbital elements to find initial pos and vel
+% TODO: switch to using meters and rewrite relevant functions
 [el, jD0] = ISSOrbit('fixed');
 [r0, v0] = El2RV(el); % [km, km/s]
 
@@ -37,18 +40,25 @@ x0 = [
     wRW0;
 ];
 
+nStates = 16;
+
 
 % data struct
 % TODO: define in separate file?
 % TODO: define body frame (sct has z-axis longitudinal)
 % satellite moi
 d.ISat = InertiaCubeSat('3U', 6);
+
 % external torques
 d.TExt = [0 0 0]';
+
 % rw moi
 d.IRW = (0.6e-3)/(5600*2*pi/60);
 % rw torques
-d.TRW = [0; 0; 0;];
+d.TRW = [0; 0; 0;]; % N m
+% max rw speed
+d.maxWRW = 5600*2*pi/60; % rad/s
+
 % indices of states in state vetor
 d.iR = 1:3;
 d.iV = 4:6;
@@ -60,7 +70,7 @@ d.iWRW = 14:16;
 
 % ode state vector functions
 % TODO: replace orbit propagator (FOrbCart) with mission team values
-xDotFn = @(x, t, d) [
+xDotFn = @(x, d) [
     FOrbCart(x);
     QKinematics(x, d); 
     EulerDynamics(x, d);
@@ -68,12 +78,27 @@ xDotFn = @(x, t, d) [
 ];
 
 %% propagate with integrator (RK4)
-% TODO: compare RK4 with ode45 or other integrators
-% TODO: write own RK4 to better suit the structure of our code
-h = 0.1;
+h = 1;
 t0 = 0;
-tf = 1000;
+tf = 90*60;
+
 t = t0:h:tf;
+nSim = length(t);
+
+
+qLVLHList = zeros(4, nSim);
+qLVLHList(:, 1) = GetLVLHQ(r0, v0);
+xList = zeros(nStates, nSim);
+xList(:, 1) = x0;
+distList = zeros(12, nSim); % [Tg; Ta; Ts; Tm]
+
+x = x0;
+
+tic
+for i = 2:nSim
+    % compute disturbances
+    % TODO: rewrite our own disturbance functions since these use sct's q
+    TGrav = GravityGradientFromR(QConj(x(d.iQ)), d.ISat, x(d.iR), 3.98600436e5);
 
 xList = zeros(length(x0), length(t));
 xList(:, 1) = x0;
@@ -102,10 +127,34 @@ for i = 2:length(t)
     x = PropState(xDotFn, x, d, h, t(i-1):h:t(i));
     xList(:, i) = x;
 end
+    jD = jD0 + t(i)/86400;
+    s = SunV1(jD, x(d.iR));
+    B = BDipole(x(d.iR), jD);
+    [Tg, Ta, Ts, Tm] = DisturbanceTorques(x, d, s, B);
 
-%out = RK4Convergence(x0, xDotFn, d, 15);
+    d.TExt = Tg + Ta + Ts + Tm;
+
+
+    x = PropState(xDotFn, x, d, h);
+
+    % renormalise quaternion
+    x(d.iQ) = x(d.iQ) ./ norm(x(d.iQ));
+
+
+    xList(:, i) = x;
+    qLVLHList(:, i) = GetLVLHQ(x(d.iR), x(d.iV));
+    distList(:, i) = [Tg; Ta; Ts; Tm];
+end
+toc
+
+%d.TExt = zeros(3, 1);
+%out = RK4Convergence(x0, xDotFn, d, 8, 6, struct("t0", t0, "tf", tf, "h0", 10));
 
 %% plot
+
+% convert time to minutes
+t = t./60;
+
 figure('Name', 'State Variables');
 tl = tiledlayout(4, 2);
 tl.Title.String = 'State Variables (ECI)';
@@ -115,14 +164,14 @@ nexttile
 plot(t, xList(d.iR, :))
 legend('r_x', 'r_y', 'r_z')
 grid on
-ylabel('r (m)')
+ylabel('r (km)')
 ylim('padded')
 
 nexttile
 plot(t, xList(d.iV, :))
 legend('v_x', 'v_y', 'v_z')
 grid on
-ylabel('v (m/s)')
+ylabel('v (km/s)')
 ylim('padded')
 
 nexttile([2 1])
@@ -146,24 +195,30 @@ grid on
 ylabel('\omega_r_w (rad/s)')
 ylim('padded')
 
-xlabel('t (s)')
+xlabel('t (min)')
 
 %% attitude change plots
+
 % euler axis/angle
 % convert attitude quaternion into reference with initial quaternion
-qBL = zeros(4, size(xList, 2));
+qBL = zeros(4, nSim);
 
-for i = 1:size(xList, 2)
-    qBL(:, i) = QProd(xList(d.iQ, i), QConj(q0));
+for i = 1:nSim
+    qBL(:, i) = QProd(xList(d.iQ, i), QConj(qLVLHList(:, i)));
+    % enforce sign continuity
+    if ( i >  1 && (dot(qBL(:, i), qBL(:, i-1)) < 0))
+        qBL(:, i) = -qBL(:, i);
+    end
 end
 
+% TODO: put this in a function
 qs = qBL(1, :);
 qv = qBL(2:4, :);
 eulAngle = 2*acos(min(qs, 1));
 eulAxis = qv./vecnorm(qv, 2, 1);
 
 figure('Name', 'Attitude (LVLH -> body)');
-tiledlayout(4, 1)
+tiledlayout(3, 1)
 
 nexttile
 plot(t, qBL)
@@ -185,10 +240,9 @@ ylim('padded')
 
 % euler angles (3-2-1)
 
-n = size(qBL, 2);
-
-eulAngles = zeros(3, n);
-for i = 1:n
+%{
+eulAngles = zeros(3, nSim);
+for i = 1:nSim
     % TODO: rewrite Q2Eul
     eulAngles(:, i) = Q2Eul(qBL(:, i));
 end
@@ -198,7 +252,37 @@ plot(t, rad2deg(eulAngles))
 grid on
 legend('x', 'y', 'z')
 ylabel('euler angles (deg)')
-xlabel('t (s)')
-
+xlabel('t (min)')
+%}
 
 %AnimQ(qBL);
+
+%% disturbance plots
+
+figure('Name', 'Disturbance Torques (Body)')
+tiledlayout(4, 1)
+
+nexttile
+plot(t, distList(1:3, :))
+title('Gravity Gradient')
+ylabel('T_g (N m)')
+
+legend('x', 'y', 'z')
+
+nexttile
+plot(t, distList(4:6, :))
+title('Aerodynamic Drag')
+ylabel('T_a (N m)')
+
+nexttile
+plot(t, distList(7:9, :))
+title('SRP')
+ylabel('T_s (N m)')
+
+nexttile
+plot(t, distList(10:12, :))
+title('Magnetic Field')
+ylabel('T_m (N m)')
+xlabel('t (min)')
+
+
