@@ -100,6 +100,33 @@ for i = 2:nSim
     % TODO: rewrite our own disturbance functions since these use sct's q
     TGrav = GravityGradientFromR(QConj(x(d.iQ)), d.ISat, x(d.iR), 3.98600436e5);
 
+xList = zeros(length(x0), length(t));
+xList(:, 1) = x0;
+
+x = x0;
+for i = 2:length(t)
+    if mod(i,3) == 0 || i == 2
+        T_c = ControlTorque([1; 0; 0; 0], x, d);
+        % limit to 586 rad/s
+        for j = 1:3
+            if x(d.iWRW(j)) > 586
+                x(d.iWRW(j)) = 586;
+                d.TRW(j) = 0;
+            elseif x(d.iWRW(j)) < -586
+                x(d.iWRW(j)) = -586;
+                d.TRW(j) = 0;
+            else
+                d.TRW(j) = -T_c(j);
+            end
+        end
+        if i == 2
+            d.TRW
+        end
+    end
+
+    x = PropState(xDotFn, x, d, h, t(i-1):h:t(i));
+    xList(:, i) = x;
+end
     jD = jD0 + t(i)/86400;
     s = SunV1(jD, x(d.iR));
     B = BDipole(x(d.iR), jD);
