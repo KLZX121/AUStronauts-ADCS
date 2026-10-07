@@ -107,21 +107,7 @@ x = x0;
 for i = 2:length(t)
     if mod(i,3) == 0 || i == 2
         T_c = ControlTorque([1; 0; 0; 0], x, d);
-        % limit to 586 rad/s
-        for j = 1:3
-            if x(d.iWRW(j)) > 586
-                x(d.iWRW(j)) = 586;
-                d.TRW(j) = 0;
-            elseif x(d.iWRW(j)) < -586
-                x(d.iWRW(j)) = -586;
-                d.TRW(j) = 0;
-            else
-                d.TRW(j) = -T_c(j);
-            end
-        end
-        if i == 2
-            d.TRW
-        end
+        
     end
 
     x = PropState(xDotFn, x, d, h, t(i-1):h:t(i));
