@@ -66,6 +66,9 @@ d.iQ = 7:10;
 d.iWSat = 11:13;
 d.iWRW = 14:16;
 
+% satellite geometry
+geometry = jsondecode(fileread('../geometry.json'));
+
 %% plant
 
 % ode state vector functions
@@ -90,15 +93,30 @@ qLVLHList = zeros(4, nSim);
 qLVLHList(:, 1) = GetLVLHQ(r0, v0);
 xList = zeros(nStates, nSim);
 xList(:, 1) = x0;
-distList = zeros(12, nSim); % [Tg; Ta; Ts; Tm]
+distList(1:nSim) = struct( ...
+    'g', zeros(3, 1), ...
+    'a', zeros(3, 1), ...
+    's', zeros(3, 1), ...
+    'm', zeros(3, 1) ...
+); % list of disturbance torque structs
+
+surfForce.a.f = zeros(3, geometry.n_surfaces);
+surfForce.a.t = surfForce.a.f;
+surfForce.s.f = surfForce.a.f;
+surfForce.s.t = surfForce.a.f;
+surfForces(1:nSim) = surfForce;
+
+% list of sun vector
+sList = zeros(3, nSim);
+
+rsList = zeros(1, nSim);
+[sList(:, 1), rsList(1)] = SunV1(jD0, r0);
 
 x = x0;
 
 tic
 for i = 2:nSim
     % compute disturbances
-    % TODO: rewrite our own disturbance functions since these use sct's q
-    TGrav = GravityGradientFromR(QConj(x(d.iQ)), d.ISat, x(d.iR), 3.98600436e5);
 
 xList = zeros(length(x0), length(t));
 xList(:, 1) = x0;
@@ -114,11 +132,18 @@ for i = 2:length(t)
     xList(:, i) = x;
 end
     jD = jD0 + t(i)/86400;
-    s = SunV1(jD, x(d.iR));
+    [s, rs] = SunV1(jD, x(d.iR));
     B = BDipole(x(d.iR), jD);
-    [Tg, Ta, Ts, Tm] = DisturbanceTorques(x, d, s, B);
+    % TODO: get environmental densities
+    % TODO: get srp
 
-    d.TExt = Tg + Ta + Ts + Tm;
+    env.rho = 3.8e-12; % kg m^-3
+    env.p = 4.5e-6; % N m^-2
+    env.s = s;
+
+    [distT, distSurf] = DisturbanceTorques(x, d, env, geometry);
+
+    d.TExt = distT.g + distT.a + distT.s + distT.m;
 
 
     x = PropState(xDotFn, x, d, h);
@@ -129,13 +154,30 @@ end
 
     xList(:, i) = x;
     qLVLHList(:, i) = GetLVLHQ(x(d.iR), x(d.iV));
-    distList(:, i) = [Tg; Ta; Ts; Tm];
+    distList(i) = distT;
+    surfForces(i) = distSurf;
+
+    sList(:, i) = s;
+    rsList(i) = rs;
 end
 toc
 
 %d.TExt = zeros(3, 1);
 %out = RK4Convergence(x0, xDotFn, d, 8, 6, struct("t0", t0, "tf", tf, "h0", 10));
 
+% write states to file
+writelines(jsonencode(xList'), 'xdata.json')
+% write surface forces to file
+% need to transpose internal matrices first
+for i = 1:nSim
+    surfOut(i).a.f = surfForces(i).a.f';
+    surfOut(i).a.t = surfForces(i).a.t';
+    surfOut(i).s.f = surfForces(i).s.f';
+    surfOut(i).s.t = surfForces(i).s.t';
+end
+writelines(jsonencode(surfOut), 'surfdata.json')
+% write sun vector and distance
+writelines(jsonencode((sList .* rsList)'), 'rs.json')
 %% plot
 
 % convert time to minutes
@@ -249,26 +291,28 @@ figure('Name', 'Disturbance Torques (Body)')
 tiledlayout(4, 1)
 
 nexttile
-plot(t, distList(1:3, :))
+plot(t, [distList.g])
 title('Gravity Gradient')
 ylabel('T_g (N m)')
+grid on
 
 legend('x', 'y', 'z')
 
 nexttile
-plot(t, distList(4:6, :))
+plot(t, [distList.a])
 title('Aerodynamic Drag')
 ylabel('T_a (N m)')
+grid on
 
 nexttile
-plot(t, distList(7:9, :))
+plot(t, [distList.s])
 title('SRP')
 ylabel('T_s (N m)')
+grid on
 
 nexttile
-plot(t, distList(10:12, :))
+plot(t, [distList.m])
 title('Magnetic Field')
 ylabel('T_m (N m)')
 xlabel('t (min)')
-
-
+grid on
