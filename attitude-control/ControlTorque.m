@@ -29,33 +29,19 @@ inertiaSat = InertiaCubeSat('3U', 6); % assuming uniform distribution
 
 % input
 q_current = x(d.iQ);
-q_desired = q_d; % [0.295347131961402;0.909299901960774;0.229703139008898;-0.182154406660284]; 
+q_desired = q_d;
  
-% Find the delta quaternion (change in quaternion needed)
-delta_q     = QProd( q_desired, QConj(q_current));
+% Find the error quaternion (change in quaternion needed)
+delta_q     = QProd( q_current, QConj(q_desired));
 
 %% Control torque from control
 
-k_p = 1e-5; % proportional gain (CHANGE)
-k_d = 0.5e-5; % derivative gain (CHANGE)
+k_p = 1.62e-4; % proportional gain (CHANGE)
+k_d = 9.75e-4; % derivative gain (CHANGE)
 w = x(d.iWSat); % angular velocity of satellite
 
 % Calculate the control torque vector
-T_c = -k_p * sign(delta_q(1)) * delta_q(2:4) - k_d * w;
-
-
-%% Comparison Torque
-
-[angle, u]  = QAngleUnit( delta_q );
-% the angle is the amount of rotation needed around the unit vector u
-% calculate a single torque value based on the desired rotation
-
-t = 60; % placeholder parameter
-
-angular_acceleration = 2*angle / t^2;
-
-single_torque = inertiaSat * angular_acceleration; %(1, 1)
-
-T_c2 = single_torque*u; % torque * unit vector
+%T_c = -k_p * sign(delta_q(1)) * delta_q(2:4) - k_d * w;
+T_c = -k_p * sign(delta_q(1)) * delta_q(2:4) - k_d * (1 +- delta_q(2:4).' * delta_q(2:4)) * w;
 
 end
