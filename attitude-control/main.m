@@ -59,6 +59,9 @@ d.TRW = [0; 0; 0;]; % N m
 % max rw speed
 d.maxWRW = 5600*2*pi/60; % rad/s
 
+% controller frequency
+d.controlHZ = 1;
+
 % indices of states in state vetor
 d.iR = 1:3;
 d.iV = 4:6;
@@ -89,60 +92,51 @@ t = t0:h:tf;
 nSim = length(t);
 
 
-qLVLHList = zeros(4, nSim);
-qLVLHList(:, 1) = GetLVLHQ(r0, v0);
-xList = zeros(nStates, nSim);
-xList(:, 1) = x0;
-distList(1:nSim) = struct( ...
+results.qLVLH = zeros(4, nSim);
+results.qLVLH(:, 1) = GetLVLHQ(r0, v0);
+results.x = zeros(nStates, nSim);
+results.x(:, 1) = x0;
+results.TC = zeros(3, nSim);
+results.dist(1:nSim) = struct( ...
     'g', zeros(3, 1), ...
     'a', zeros(3, 1), ...
     's', zeros(3, 1), ...
     'm', zeros(3, 1) ...
-); % list of disturbance torque structs
+);
 
 surfForce.a.f = zeros(3, geometry.n_surfaces);
 surfForce.a.t = surfForce.a.f;
 surfForce.s.f = surfForce.a.f;
 surfForce.s.t = surfForce.a.f;
-surfForces(1:nSim) = surfForce;
+results.surfForces(1:nSim) = surfForce;
 
-% list of sun vector
-sList = zeros(3, nSim);
-
-rsList = zeros(1, nSim);
-[sList(:, 1), rsList(1)] = SunV1(jD0, r0);
+results.s = zeros(3, nSim);
+results.rs = zeros(1, nSim);
+[results.s(:, 1), results.rs(1)] = SunV1(jD0, r0);
 
 x = x0;
 
 tic
 for i = 2:nSim
-    % compute disturbances
+    % lvlh
+    qLVLH = GetLVLHQ(x(d.iR), x(d.iV));
 
-xList = zeros(length(x0), length(t));
-xList(:, 1) = x0;
-
-x = x0;
-for i = 2:length(t)
-    if mod(i,3) == 0 || i == 2
-        T_c = ControlTorque([1; 0; 0; 0], x, d);
-        
+    % compute control torque
+    if i == 2 || mod(i*h,d.controlHZ) == 0
+        TC = ControlTorque(qLVLH, x, d);
+        d.TRW = -TC;
     end
 
-    x = PropState(xDotFn, x, d, h, t(i-1):h:t(i));
-    xList(:, i) = x;
-end
-    jD = jD0 + t(i)/86400;
-    [s, rs] = SunV1(jD, x(d.iR));
-    B = BDipole(x(d.iR), jD);
+    % compute disturbances
     % TODO: get environmental densities
     % TODO: get srp
-
+    jD = jD0 + t(i)/86400;
+    [env.s, rs] = SunV1(jD, x(d.iR));
+    env.B = BDipole(x(d.iR), jD);
     env.rho = 3.8e-12; % kg m^-3
     env.p = 4.5e-6; % N m^-2
-    env.s = s;
 
     [distT, distSurf] = DisturbanceTorques(x, d, env, geometry);
-
     d.TExt = distT.g + distT.a + distT.s + distT.m;
 
 
@@ -152,32 +146,33 @@ end
     x(d.iQ) = x(d.iQ) ./ norm(x(d.iQ));
 
 
-    xList(:, i) = x;
-    qLVLHList(:, i) = GetLVLHQ(x(d.iR), x(d.iV));
-    distList(i) = distT;
-    surfForces(i) = distSurf;
-
-    sList(:, i) = s;
-    rsList(i) = rs;
+    results.x(:, i) = x;
+    results.TC(:, i) = d.TRW;
+    results.qLVLH(:, i) = qLVLH;
+    results.dist(i) = distT;
+    results.surfForces(i) = distSurf;
+    results.s(:, i) = env.s;
+    results.rs(i) = rs;
 end
 toc
+
 
 %d.TExt = zeros(3, 1);
 %out = RK4Convergence(x0, xDotFn, d, 8, 6, struct("t0", t0, "tf", tf, "h0", 10));
 
-% write states to file
-writelines(jsonencode(xList'), 'xdata.json')
-% write surface forces to file
-% need to transpose internal matrices first
+
+% write results to files
+mkdir('../results');
+writelines(jsonencode(results.x'), '../results/xdata.json')
 for i = 1:nSim
-    surfOut(i).a.f = surfForces(i).a.f';
-    surfOut(i).a.t = surfForces(i).a.t';
-    surfOut(i).s.f = surfForces(i).s.f';
-    surfOut(i).s.t = surfForces(i).s.t';
+    surfOut(i).a.f = results.surfForces(i).a.f';
+    surfOut(i).a.t = results.surfForces(i).a.t';
+    surfOut(i).s.f = results.surfForces(i).s.f';
+    surfOut(i).s.t = results.surfForces(i).s.t';
 end
-writelines(jsonencode(surfOut), 'surfdata.json')
-% write sun vector and distance
-writelines(jsonencode((sList .* rsList)'), 'rs.json')
+writelines(jsonencode(surfOut), '../results/surfdata.json')
+writelines(jsonencode((results.s .* results.rs)'), '../results/rs.json')
+
 %% plot
 
 % convert time to minutes
@@ -189,38 +184,46 @@ tl.Title.String = 'State Variables (ECI)';
 tl.Title.FontWeight = 'bold';
 
 nexttile
-plot(t, xList(d.iR, :))
+plot(t, results.x(d.iR, :))
 legend('r_x', 'r_y', 'r_z')
 grid on
 ylabel('r (km)')
 ylim('padded')
 
 nexttile
-plot(t, xList(d.iV, :))
+plot(t, results.x(d.iV, :))
 legend('v_x', 'v_y', 'v_z')
 grid on
 ylabel('v (km/s)')
 ylim('padded')
 
 nexttile([2 1])
-plot(t, xList(d.iQ, :))
+plot(t, results.x(d.iQ, :))
 legend('q_s', 'q_x', 'q_y', 'q_z')
 grid on
 ylabel('q')
 ylim('padded')
 
 nexttile([2 1])
-plot(t, xList(d.iWSat, :))
+plot(t, results.x(d.iWSat, :))
 legend('\omega_x', '\omega_y', '\omega_z')
 grid on
 ylabel('\omega_s_a_t (rad/s)')
 ylim('padded')
 
 nexttile
-plot(t, xList(d.iWRW, :))
+plot(t, results.x(d.iWRW, :))
 legend('\omega_x', '\omega_y', '\omega_z')
 grid on
 ylabel('\omega_r_w (rad/s)')
+ylim('padded')
+
+nexttile
+plot(t, results.TC)
+title('Command Torques')
+legend('T_x', 'T_y', 'T_z')
+grid on
+ylabel('T_r_w (N/m)')
 ylim('padded')
 
 xlabel('t (min)')
@@ -232,7 +235,7 @@ xlabel('t (min)')
 qBL = zeros(4, nSim);
 
 for i = 1:nSim
-    qBL(:, i) = QProd(xList(d.iQ, i), QConj(qLVLHList(:, i)));
+    qBL(:, i) = QProd(results.x(d.iQ, i), QConj(results.qLVLH(:, i)));
     % enforce sign continuity
     if ( i >  1 && (dot(qBL(:, i), qBL(:, i-1)) < 0))
         qBL(:, i) = -qBL(:, i);
@@ -291,7 +294,7 @@ figure('Name', 'Disturbance Torques (Body)')
 tiledlayout(4, 1)
 
 nexttile
-plot(t, [distList.g])
+plot(t, [results.dist.g])
 title('Gravity Gradient')
 ylabel('T_g (N m)')
 grid on
@@ -299,19 +302,19 @@ grid on
 legend('x', 'y', 'z')
 
 nexttile
-plot(t, [distList.a])
+plot(t, [results.dist.a])
 title('Aerodynamic Drag')
 ylabel('T_a (N m)')
 grid on
 
 nexttile
-plot(t, [distList.s])
+plot(t, [results.dist.s])
 title('SRP')
 ylabel('T_s (N m)')
 grid on
 
 nexttile
-plot(t, [distList.m])
+plot(t, [results.dist.m])
 title('Magnetic Field')
 ylabel('T_m (N m)')
 xlabel('t (min)')
