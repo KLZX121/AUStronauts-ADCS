@@ -42,18 +42,12 @@ w = x(d.iWSat); % angular velocity of satellite
 
 % Calculate the control torque vector
 %T_c = -k_p * sign(delta_q(1)) * delta_q(2:4) - k_d * w;
-t_c = -k_p * sign(delta_q(1)) * delta_q(2:4) - k_d * (1 +- delta_q(2:4).' * delta_q(2:4)) * w;
+T_c = -k_p * sign(delta_q(1)) * delta_q(2:4) - k_d * (1 +- delta_q(2:4).' * delta_q(2:4)) * w;
 
-% limit to 586 rad/s
+% limit to max RW speed
 for j = 1:3
-    if x(d.iWRW(j)) > 586
-        %x(d.iWRW(j)) = 586;
+    if abs(x(d.iWRW(j))) > d.maxWRW
         T_c(j) = 0;
-    elseif x(d.iWRW(j)) < -586
-        %x(d.iWRW(j)) = -586;
-        T_c(j) = 0;
-    else
-        T_c(j) = -t_c(j);
     end
 end
 
