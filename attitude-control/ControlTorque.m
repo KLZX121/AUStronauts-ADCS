@@ -32,7 +32,7 @@ q_current = x(d.iQ);
 q_desired = q_d;
  
 % Find the error quaternion (change in quaternion needed)
-delta_q     = QProd( q_current, QConj(q_desired));
+delta_q = QProd( q_current, QConj(q_desired));
 
 %% Control torque from control
 
