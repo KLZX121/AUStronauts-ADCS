@@ -124,7 +124,7 @@ for i = 2:nSim
     % compute control torque
     if i == 2 || mod(i*h,d.controlHZ) == 0
         TC = ControlTorque(qLVLH, x, d);
-        d.TRW = -TC;
+        %d.TRW = -TC;
     end
 
     % compute disturbances
@@ -136,7 +136,7 @@ for i = 2:nSim
     env.rho = 3.8e-12; % kg m^-3
     env.p = 4.5e-6; % N m^-2
 
-    [distT, distSurf] = DisturbanceTorques(x, d, env, geometry);
+    [distT, distSurf] = DisturbanceTorques(x, d, env, geometry, true);
     d.TExt = distT.g + distT.a + distT.s + distT.m;
 
 
@@ -162,7 +162,9 @@ toc
 
 
 % write results to files
-mkdir('../results');
+if ~exist('../results', 'dir')
+    mkdir('../results');
+end
 writelines(jsonencode(results.x'), '../results/xdata.json')
 for i = 1:nSim
     surfOut(i).a.f = results.surfForces(i).a.f';

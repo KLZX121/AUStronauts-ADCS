@@ -1,6 +1,6 @@
-function [T, surfData] = DisturbanceTorques(x, d, env, geom)
+function [T, surfData] = DisturbanceTorques(x, d, env, geom, shadowing)
 %DisturbanceTorques Calculates the four main external disturbance torques
-%   [T, surfData] = DisturbanceTorques(x, d, env, geom)
+%   [T, surfData] = DisturbanceTorques(x, d, env, geom, shadowing)
 %   
 %   Aerodynamic and SRP forces are calculated using satellite geometry, as
 %   defined by a collection of rectangular surfaces representing the
@@ -26,6 +26,7 @@ function [T, surfData] = DisturbanceTorques(x, d, env, geom)
 %       .area       (1, 1)  Area of surface (m^2)
 %       .centroid   (3, 1)  Centroid location from centre of mass (m)
 %       .Cd         (1, 1)  Coefficient of drag of the surface
+%   shadowing   (bool)      Whether to check for shadowing
 %
 %   Outputs
 %   T       (struct)    Disturbance torque struct
@@ -80,6 +81,20 @@ for i = 1:geom.n_surfaces
 
     fSRP = -env.p*ApSRP*((surf.Ca + surf.Crd)*s + (2/3*surf.Crd + 2*surf.Crs*cosThetaSRP)*surf.normal);
 
+    if shadowing
+        if ApAero ~= 0
+            isAeroShadowed = CheckShadowing(vHat, surf, geom.surfaces);
+            if isAeroShadowed
+                fAero = zeros(3, 1);
+            end
+        end
+        if ApSRP ~= 0
+            isSRPShadowed = CheckShadowing(s, surf, geom.surfaces);
+            if isSRPShadowed
+                fSRP = zeros(3, 1);
+            end
+        end
+    end
 
     % torque
     tAero = cross(surf.centroid, fAero);
