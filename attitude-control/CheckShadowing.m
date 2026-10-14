@@ -5,6 +5,9 @@ function isShadowed = CheckShadowing(v, srcPanel, targetSurfaces)
 %   Inputs
 %   v               (3, 1)      Outward direction of disturbance source (velocity or sun)
 %   srcPanel        (struct)    Panel to check for shadowing
+%   .normal         (3, 1)      Surface outward normal unit vector
+%   .vertices       (4, 3)      List of corner points defining panel
+%   .centroid       (3, 1)      Panel centroid
 %   targetSurfaces  (struct[])  List of panels to check against for shadowing
 %
 %   Outputs
