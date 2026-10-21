@@ -246,6 +246,10 @@ methods(Static)
             % set y limits to 3 times this value
             y = 3*(max([sigVals(:, minI); xVals(:, minI)]));
 
+            if isempty(y) || y == 0
+                y = 1;
+            end
+
             bound = [-y y];
         end
     end

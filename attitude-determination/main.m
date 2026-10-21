@@ -117,10 +117,7 @@ out.xSigma3List = zeros(mekfCal.nStates, nSim);
 
 % true attitude state
 q = q0;
-a = deg2rad(5).*randn(3, 1);
-b = deg2rad(5).*randn(3, 1);
-c = deg2rad(5)*randn(3, 1);
-wFn = @(t) a.*sin(b.*t) + c;
+wFn = @(t) deg2rad(10).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
 w = wFn(0);
 
 
@@ -162,7 +159,7 @@ for i = 1:nSim
 
         % TODO: investigate choice of first vector (see Wertz pg 425 and footnote)
 
-        [ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma/norm(bMag), 0.07);
+        [ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma/norm(bMag), 0.1);
         qEst = DCMToQ(ATRIAD);
         if (qEst(1) < 0)
             qEst = qEst.*-1;
@@ -242,9 +239,9 @@ toc
 % TODO: visualise ref/body frames
 % TODO: visualise reference/body vectors
 %PltOrbit(el, jD0);
-hold on
+%hold on
 %plot3(rOrb(1, 1)*1e-3, rOrb(2, 1)*1e-3, rOrb(3, 1)*1e-3, 'or', 'MarkerSize', 10, 'LineWidth', 2)
-hold off
+%hold off
 
 % plot magnetic measurement
 figure('Name', 'Magnetometer');
