@@ -100,6 +100,9 @@ gyro = GyroModel(calG);
 
 %% simulation loop
 
+% mekf
+mekfCal = MEKFGyroCal;
+
 % results
 out.qList = zeros(8, nSim);
 out.thetaErrList = zeros(1, nSim);
@@ -109,6 +112,9 @@ out.ySList = zeros(6, nSim);
 out.sList = zeros(6, nSim);
 out.yLitList = zeros(6, nSim);
 
+out.xErrList = zeros(mekfCal.nStates, nSim);
+out.xSigma3List = zeros(mekfCal.nStates, nSim);
+
 % true attitude state
 q = q0;
 a = deg2rad(5).*randn(3, 1);
@@ -117,8 +123,6 @@ c = deg2rad(5)*randn(3, 1);
 wFn = @(t) a.*sin(b.*t) + c;
 w = wFn(0);
 
-% mekf
-mekfCal = MEKFGyroCal;
 
 tic
 for i = 1:nSim
@@ -212,6 +216,11 @@ for i = 1:nSim
     out.sList(4:6, i) = uSMeas;
 
     out.yLitList(:, i) = yLit;
+
+    if mekfCal.initialised
+        out.xErrList(:, i) = mekfCal.CalcError(q, [gyro.bias; gyro.s; gyro.kU; gyro.kL]);
+        out.xSigma3List(:, i) = mekfCal.CalcSigma3();
+    end
 
 
     %%% propagate
@@ -398,11 +407,4 @@ for i = 1:length(indices)
 end
 hold off
 
-%Anim2Q([repmat(q0, 1, nSim); out.qList;])
-
-
-
-
-
-
-
+mekfCal.Plot(t, out.xErrList, out.xSigma3List)

@@ -238,8 +238,9 @@ methods(Static)
         function bound = yBounds(sigVals, xVals)
             % sets smart y limits
             
-             % get the timestep with smallest sigma-3 bound
-            [~, minI] = min(sum(sigVals));
+            % get the timestep with smallest sigma-3 bound
+            valid = any(sigVals ~= 0, 1);
+            [~, minI] = min(sum(sigVals(:, valid)));
 
             % get max of [sigma-3; x] at this timestep
             % set y limits to 3 times this value
