@@ -18,19 +18,19 @@ end
 
 %% orbital parameters
 
-% get orbital elements at some epoch
-% use issorbit for initial model
-% TODO: add polar orbit parameters
-% TODO: update with austronauts mission parameters once available
-% el    (1,6)   Elements vector [a,i,W,w,e,M]
-% jD0   (1,1)   Julian date of epoch
-[el, jD0] = ISSOrbit('fixed');
+% simulation timeframe and timestep
+t0 = 0;
+tf = 10*60;
+dt = 1;
+t = t0:dt:tf;
+nSim = length(t);
 
-% get pos + vel at orbital elements for one orbit (ECI)
-[rOrb, vOrb, tOrb] = RVFromKepler(el); % [km, km/s]
-% convert to m
+% orbit propagation
+[el, jD0] = ISSOrbit('fixed');
+[rOrb, vOrb] = RVFromKepler(el, t);
 rOrb = rOrb.*1e3;
 vOrb = vOrb.*1e3;
+jDOrb = jD0:(dt/86400):(jD0+(tf/86400));
 
 %% initial state
 
@@ -57,7 +57,7 @@ d.iQ = 7:10;
 
 %% sensor models
 
-
+% magnetometer
 calM.bias = zeros(3, 1);
 calM.D = zeros(3, 3);
 calM.O = eye(3);
@@ -65,7 +65,7 @@ calM.sigma = (120/3)*1e-9;
 
 mag = MagModel(calM);
 
-
+% coarse sun sensors
 calCSS.nSensors = 6;
 calCSS.uSensors = [eye(3) -eye(3)];
 calCSS.fov = deg2rad(120);
@@ -88,30 +88,44 @@ calCSS.alpha = 4.31e-3;
 
 css = CSSModel(calCSS);
 
+% gyro
+calG.bias = deg2rad([0.1; 0.1; 0.1])./3600;
+calG.s = 1e-6*[1500; 1000; 1500];
+calG.kU = 1e-6*[1000; 1500; 2000];
+calG.kL = 1e-6*[500; 1000; 1500];
+calG.sigG = repmat(sqrt(10)*1e-7, 3, 1);
+calG.sigB = repmat(sqrt(10)*1e-10, 3, 1);
+
+gyro = GyroModel(calG);
+
 %% simulation loop
-nSim = length(tOrb);
 
-qList = zeros(8, nSim);
-thetaErrList = zeros(1, nSim);
-qErrList = zeros(4, nSim);
-bList = zeros(6, nSim);
-ySList = zeros(6, nSim);
-sList = zeros(6, nSim);
-yLitList = zeros(6, nSim);
+% results
+out.qList = zeros(8, nSim);
+out.thetaErrList = zeros(1, nSim);
+out.qErrList = zeros(4, nSim);
+out.bList = zeros(6, nSim);
+out.ySList = zeros(6, nSim);
+out.sList = zeros(6, nSim);
+out.yLitList = zeros(6, nSim);
 
+% true attitude state
 q = q0;
-a = deg2rad(10).*randn(3, 1);
+a = deg2rad(5).*randn(3, 1);
 b = deg2rad(5).*randn(3, 1);
 c = deg2rad(5)*randn(3, 1);
 wFn = @(t) a.*sin(b.*t) + c;
 w = wFn(0);
+
+% mekf
+mekfCal = MEKFGyroCal;
 
 tic
 for i = 1:nSim
     %%% update state
     r = rOrb(:, i);
     v = vOrb(:, i);
-    jD = jD0 + tOrb(i)/86400;
+    jD = jDOrb(i);
     d.jD = jD;
 
     x = [r; v; q;];
@@ -135,48 +149,80 @@ for i = 1:nSim
 
     [ySMeas, yLit] = css.Measurement(x(d.iQ), uSRef, T, true);
     uSMeas = css.CalcSunVec(ySMeas, T);
-    
 
-    %%% TRIAD 
+    wGyro = gyro.Measurement(w, dt);
     
-    % TODO: investigate choice of first vector (see Wertz pg 425 and footnote)
     
-    [ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma/norm(bMag), 0.07);
-    qTRIAD = DCMToQ(ATRIAD);
-    if (qTRIAD(1) < 0)
-        qTRIAD = qTRIAD.*-1;
+    if ~mekfCal.initialised
+        %%% TRIAD
+
+        % TODO: investigate choice of first vector (see Wertz pg 425 and footnote)
+
+        [ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma/norm(bMag), 0.07);
+        qEst = DCMToQ(ATRIAD);
+        if (qEst(1) < 0)
+            qEst = qEst.*-1;
+        end
+
+        %%% Initialise MEKF
+        % initialised when 3 valid css
+        if sum(yLit == 1) == 3
+            fprintf('MEKF initialised at %.2f min\n', t(i)./60)
+
+            x0C = zeros(15, 1);
+            P0C = blkdiag( ...
+                PTRIAD, ...
+                (0.2*pi/(3600*180))^2.*eye(3), ...
+                (0.002/3)^2.*eye(3), ...
+                (0.002/3)^2.*eye(3), ...
+                (0.002/3)^2.*eye(3) ...
+                );
+            QC = blkdiag(diag([gyro.sigG.^2; gyro.sigB.^2]), zeros(9));
+
+            mekfCal.Initialise(x0C, qEst, P0C, QC, gyro, mag, css);
+        end
+    else
+        %%% Step MEKF
+
+        mekfCal.Step(dt, q, bRef, uSRef, T, wGyro);
+
+        qEst = mekfCal.qEst;
+        if (qEst(1) < 0)
+            qEst = qEst.*-1;
+        end
     end
 
     %%% Attitude error
-    [thetaErr, qErr] = QAttErr(q, qTRIAD);
+    [thetaErr, qErr] = QAttErr(q, qEst);
 
 
     %%% save
-    qList(1:4, i) = x(d.iQ);
-    qList(5:8, i) = qTRIAD;
+    out.qList(1:4, i) = x(d.iQ);
+    out.qList(5:8, i) = qEst;
 
-    thetaErrList(i) = thetaErr;
-    qErrList(:, i) = qErr;
+    out.thetaErrList(i) = thetaErr;
+    out.qErrList(:, i) = qErr;
 
-    bList(1:3, i) = QToDCM(x(d.iQ))*bRef;
-    bList(4:6, i) = bMag;
+    out.bList(1:3, i) = QToDCM(x(d.iQ))*bRef;
+    out.bList(4:6, i) = bMag;
 
-    ySList(:, i) = ySMeas;
+    out.ySList(:, i) = ySMeas;
 
-    sList(1:3, i) = QToDCM(x(d.iQ))*uSRef;
-    sList(4:6, i) = uSMeas;
+    out.sList(1:3, i) = QToDCM(x(d.iQ))*uSRef;
+    out.sList(4:6, i) = uSMeas;
 
-    yLitList(:, i) = yLit;
+    out.yLitList(:, i) = yLit;
 
 
     %%% propagate
-    q = MEKF.PropQDisc(q, w, tOrb(2) - tOrb(1));
+    gyro.PropagateBias(dt);
+    q = MEKF.PropQDisc(q, w, dt);
     q = q/norm(q);
     if (q(1) < 0)
         q = q.*-1;
     end
     if (i < nSim)
-        w = wFn(tOrb(i+1));
+        w = wFn(t(i+1));
     end
 end
 toc
@@ -186,9 +232,9 @@ toc
 % visualise orbit path and positions
 % TODO: visualise ref/body frames
 % TODO: visualise reference/body vectors
-PltOrbit(el, jD0);
+%PltOrbit(el, jD0);
 hold on
-plot3(rOrb(1, 1)*1e-3, rOrb(2, 1)*1e-3, rOrb(3, 1)*1e-3, 'or', 'MarkerSize', 10, 'LineWidth', 2)
+%plot3(rOrb(1, 1)*1e-3, rOrb(2, 1)*1e-3, rOrb(3, 1)*1e-3, 'or', 'MarkerSize', 10, 'LineWidth', 2)
 hold off
 
 % plot magnetic measurement
@@ -197,12 +243,12 @@ tl = tiledlayout(3, 1);
 tl.Title.String = "Magnetic Fields (Body)";
 tl.Title.FontWeight = "bold";
 
-bList = bList.*1e9;
+out.bList = out.bList.*1e9;
 
 nexttile
-plot(tOrb./60, bList(1, :), '-')
+plot(t./60, out.bList(1, :), '-')
 hold on
-plot(tOrb./60, bList(4, :), 'x')
+plot(t./60, out.bList(4, :), 'x')
 hold off
 grid on
 xticklabels({})
@@ -212,9 +258,9 @@ ylim('padded')
 legend('IGRF', 'Mag')
 
 nexttile
-plot(tOrb./60, bList(2, :), '-')
+plot(t./60, out.bList(2, :), '-')
 hold on
-plot(tOrb./60, bList(5, :), 'x')
+plot(t./60, out.bList(5, :), 'x')
 hold off
 grid on
 xticklabels({})
@@ -222,9 +268,9 @@ ylabel('b_y (nT)')
 ylim('padded')
 
 nexttile
-plot(tOrb./60, bList(3, :), '-')
+plot(t./60, out.bList(3, :), '-')
 hold on
-plot(tOrb./60, bList(6, :), 'x')
+plot(t./60, out.bList(6, :), 'x')
 hold off
 grid on
 ylabel('b_z (nT)')
@@ -244,7 +290,7 @@ box on
 hold on
 for i = 1:nSim
     for j = 1:css.nSensors
-        litStatus = yLitList(j, i);
+        litStatus = out.yLitList(j, i);
 
         if litStatus == 1 % in fov
             spec = 'o';
@@ -254,7 +300,7 @@ for i = 1:nSim
             spec = '.';
         end
 
-        plot(tOrb(i)./60, ySList(j, i), spec, 'Color', col(j, :))
+        plot(t(i)./60, out.ySList(j, i), spec, 'Color', col(j, :))
     end
 end
 hold off
@@ -278,10 +324,10 @@ hold off
 legend([legP{:}], {'+x', '+y', '+z', '-x', '-y', '-z', 'lit in FOV', 'lit outside FOV', 'unlit'})
 
 nexttile
-plot(tOrb./60, sList(1, :), '-')
+plot(t./60, out.sList(1, :), '-')
 title("Sun Vectors (Body)")
 hold on
-plot(tOrb./60, sList(4, :), 'x')
+plot(t./60, out.sList(4, :), 'x')
 hold off
 grid on
 xticklabels({})
@@ -291,9 +337,9 @@ ylim('padded')
 legend('s_r_e_f', 's_c_s_s')
 
 nexttile
-plot(tOrb./60, sList(2, :), '-')
+plot(t./60, out.sList(2, :), '-')
 hold on
-plot(tOrb./60, sList(5, :), 'x')
+plot(t./60, out.sList(5, :), 'x')
 hold off
 grid on
 xticklabels({})
@@ -301,9 +347,9 @@ ylabel('s_y')
 ylim('padded')
 
 nexttile
-plot(tOrb./60, sList(3, :), '-')
+plot(t./60, out.sList(3, :), '-')
 hold on
-plot(tOrb./60, sList(6, :), 'x')
+plot(t./60, out.sList(6, :), 'x')
 hold off
 grid on
 ylabel('s_z')
@@ -315,11 +361,11 @@ xlabel('t (min)')
 figure('Name', 'Estimated Attitude')
 colororder(lines(4))
 
-plot(tOrb./60, qList(1:4, :), '-', 'DisplayName', 'q_t_r_u_e')
+plot(t./60, out.qList(1:4, :), '-', 'DisplayName', 'q_t_r_u_e')
 hold on
-plot(tOrb./60, qList(5:8, :), 'x','DisplayName', 'q_T_R_I_A_D')
+plot(t./60, out.qList(5:8, :), 'x','DisplayName', 'q_e_s_t')
 hold off
-title('Estimated Quaternion (TRIAD)')
+title('Estimated Quaternion')
 ylabel('q')
 xlabel('t (min)')
 legend()
@@ -330,7 +376,7 @@ figure('Name', 'Attitude Error')
 tiledlayout(2, 1)
 
 nexttile
-plot(tOrb./60, qErrList)
+plot(t./60, out.qErrList)
 title('Error Quaternion')
 ylabel('q error')
 xlabel('t (min)')
@@ -339,20 +385,20 @@ ylim('padded')
 legend('q_s', 'q_x', 'q_y', 'q_z')
 
 nexttile
-plot(tOrb./60, rad2deg(thetaErrList), '-', 'MarkerSize', 8)
+plot(t./60, rad2deg(out.thetaErrList), '-', 'MarkerSize', 8)
 title('Angular Error')
 ylabel('\theta error (deg)')
 xlabel('t (min)')
 grid on
 
 hold on
-indices = find(sum(yLitList == 1) == 3);
+indices = find(sum(out.yLitList == 1) == 3);
 for i = 1:length(indices)
-    xline(tOrb(indices(i))./60)
+    xline(t(indices(i))./60)
 end
 hold off
 
-%Anim2Q([repmat(q0, 1, nSim); qList;])
+%Anim2Q([repmat(q0, 1, nSim); out.qList;])
 
 
 

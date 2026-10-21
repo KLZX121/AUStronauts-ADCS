@@ -14,7 +14,9 @@ classdef(Abstract) MEKF < handle
 properties(Abstract, Constant)
     nStates (1, 1) double {mustBeInteger, mustBePositive}
 end
-properties(SetAccess=protected)
+properties
+    initialised logical = false
+
     xEst (:, 1) double
     qEst (4, 1) double
     P (:, :) double
@@ -62,11 +64,13 @@ methods
         o.gyro = gyro;
         o.mag = mag;
         o.css = css;
+
+        o.initialised = true;
     end
     
     function o = Step(o, dt, q, bRef, uSRef, T, wGyro)
         %Step Steps the filter forward by one timestep
-        %   o = Step(o, dt, bRef, q, wGyro)
+        %   o = Step(o, dt, q, bRef, uSRef, T, wGyro)
         %   
         %   Use this function within the simulation loop
         %
