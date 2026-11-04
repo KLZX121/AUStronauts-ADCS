@@ -19,8 +19,6 @@ t = t0:dt:tf;
 % orbit propagation
 [el, jD0] = ISSOrbit('fixed');
 [rOrb, vOrb] = RVFromKepler(el, t);
-rOrb = rOrb.*1e3;
-vOrb = vOrb.*1e3;
 jDOrb = jD0:(dt/86400):(jD0+(tf/86400));
 
 %% specs

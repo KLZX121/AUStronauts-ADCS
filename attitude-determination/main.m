@@ -16,44 +16,28 @@ if isempty(which('QProd'))
     addpath(genpath('../common'));
 end
 
-%% orbital parameters
+%% read data
+xData = jsondecode(readlines('../results/xdata.json', 'EmptyLineRule','skip'))';
+jDData = jsondecode(readlines('../results/jd.json', 'EmptyLineRule', 'skip'));
+eclipseData = jsondecode(readlines('../results/eclipse.json', 'EmptyLineRule', 'skip'));
 
 % simulation timeframe and timestep
 t0 = 0;
-tf = 10*60;
-dt = 1;
+tf = (jDData(end)-jDData(1))*86400;
+dt = tf/(length(jDData)-1);
 t = t0:dt:tf;
 nSim = length(t);
 
-% orbit propagation
-[el, jD0] = ISSOrbit('fixed');
-[rOrb, vOrb] = RVFromKepler(el, t);
-rOrb = rOrb.*1e3;
-vOrb = vOrb.*1e3;
-jDOrb = jD0:(dt/86400):(jD0+(tf/86400));
-
-%% initial state
-
-% initial position and velocity
-r0 = rOrb(:, 1);
-v0 = vOrb(:, 1);
-
-% initialise attitude quaternion to LVLH (ECI -> LVLH)
-q0 = GetLVLHQ(r0, v0);
-if (q0(1) < 0)
-    q0 = q0.*-1;
-end
-
-% initial state vector
-x = [r0; v0; q0];
+PLOT_SENSOR_MEASUREMENTS = false;
 
 % temperature
 T = 60;
 
-d.jD = jD0;
 d.iR = 1:3;
 d.iV = 4:6;
 d.iQ = 7:10;
+d.iWSat = 11:13;
+d.iWRW = 14:16;
 
 %% sensor models
 
@@ -102,6 +86,7 @@ gyro = GyroModel(calG);
 
 % mekf
 mekfCal = MEKFGyroCal;
+wPrev = xData(d.iWSat, 1);
 
 % results
 out.qList = zeros(8, nSim);
@@ -115,21 +100,19 @@ out.yLitList = zeros(6, nSim);
 out.xErrList = zeros(mekfCal.nStates, nSim);
 out.xSigma3List = zeros(mekfCal.nStates, nSim);
 
-% true attitude state
-q = q0;
-wFn = @(t) deg2rad(10).*[sin(0.01*t); sin(0.0085*t); cos(0.0085*t)];
-w = wFn(0);
-
-
 tic
 for i = 1:nSim
     %%% update state
-    r = rOrb(:, i);
-    v = vOrb(:, i);
-    jD = jDOrb(i);
+    x = xData(:, i);
+
+    r = x(d.iR);
+    v = x(d.iV);
+    q = x(d.iQ);
+    w = x(d.iWSat);
+    jD = jDData(i);
+
     d.jD = jD;
 
-    x = [r; v; q;];
 
 
     %%% reference vectors (ECI)
@@ -145,19 +128,22 @@ for i = 1:nSim
 
     %%% sensor models (body frame)
     
-    bMag = mag.Measurement(x(d.iQ), bRef, true);
+    bMag = mag.Measurement(q, bRef, true);
     uBMag = bMag/norm(bMag);
 
-    [ySMeas, yLit] = css.Measurement(x(d.iQ), uSRef, T, true);
+    [ySMeas, yLit] = css.Measurement(q, uSRef, T, true);
     uSMeas = css.CalcSunVec(ySMeas, T);
 
-    wGyro = gyro.Measurement(w, dt);
+    wAvg  = 0.5*(wPrev + w);
+    wGyro = gyro.Measurement(wAvg, dt);
+    wPrev = w;
     
     
     if ~mekfCal.initialised
         %%% TRIAD
 
         % TODO: investigate choice of first vector (see Wertz pg 425 and footnote)
+        % TODO: investigate empirical vs analytical triad covariance
 
         [ATRIAD, PTRIAD] = TRIAD([uBMag, uSMeas], [uBRef, uSRef], mag.sigma/norm(bMag), 0.1);
         qEst = DCMToQ(ATRIAD);
@@ -166,9 +152,12 @@ for i = 1:nSim
         end
 
         %%% Initialise MEKF
-        % initialised when 3 valid css
-        if sum(yLit == 1) == 3
-            fprintf('MEKF initialised at %.2f min\n', t(i)./60)
+        % initialised when 3 valid css and vectors at least 30
+        % deg apart
+        sinMin = 0.5;
+        sinBS  = norm(cross(uBMag, uSMeas));
+        if sum(yLit == 1) == 3 && sinBS > sinMin
+            fprintf('MEKF initialised at %.2f min (B-sun angle %.1f deg)\n', t(i)./60, asind(sinBS))
 
             x0C = zeros(15, 1);
             P0C = blkdiag( ...
@@ -184,8 +173,8 @@ for i = 1:nSim
         end
     else
         %%% Step MEKF
-
-        mekfCal.Step(dt, q, bRef, uSRef, T, wGyro);
+        mekfCal.Propagate(dt, wGyro);
+        mekfCal.Update(q, bRef, uSRef, T);
 
         qEst = mekfCal.qEst;
         if (qEst(1) < 0)
@@ -198,7 +187,7 @@ for i = 1:nSim
 
 
     %%% save
-    out.qList(1:4, i) = x(d.iQ);
+    out.qList(1:4, i) = q;
     out.qList(5:8, i) = qEst;
 
     out.thetaErrList(i) = thetaErr;
@@ -222,146 +211,132 @@ for i = 1:nSim
 
     %%% propagate
     gyro.PropagateBias(dt);
-    q = MEKF.PropQDisc(q, w, dt);
-    q = q/norm(q);
-    if (q(1) < 0)
-        q = q.*-1;
-    end
-    if (i < nSim)
-        w = wFn(t(i+1));
-    end
 end
 toc
 
 %% plots
 
-% visualise orbit path and positions
-% TODO: visualise ref/body frames
-% TODO: visualise reference/body vectors
-%PltOrbit(el, jD0);
-%hold on
-%plot3(rOrb(1, 1)*1e-3, rOrb(2, 1)*1e-3, rOrb(3, 1)*1e-3, 'or', 'MarkerSize', 10, 'LineWidth', 2)
-%hold off
-
-% plot magnetic measurement
-figure('Name', 'Magnetometer');
-tl = tiledlayout(3, 1);
-tl.Title.String = "Magnetic Fields (Body)";
-tl.Title.FontWeight = "bold";
-
-out.bList = out.bList.*1e9;
-
-nexttile
-plot(t./60, out.bList(1, :), '-')
-hold on
-plot(t./60, out.bList(4, :), 'x')
-hold off
-grid on
-xticklabels({})
-ylabel('b_x (nT)')
-ylim('padded')
-
-legend('IGRF', 'Mag')
-
-nexttile
-plot(t./60, out.bList(2, :), '-')
-hold on
-plot(t./60, out.bList(5, :), 'x')
-hold off
-grid on
-xticklabels({})
-ylabel('b_y (nT)')
-ylim('padded')
-
-nexttile
-plot(t./60, out.bList(3, :), '-')
-hold on
-plot(t./60, out.bList(6, :), 'x')
-hold off
-grid on
-ylabel('b_z (nT)')
-ylim('padded')
-
-xlabel('t (min)')
-
-% plot sun measurements
-figure('Name', 'Sun Sensors');
-tl = tiledlayout(4, 1);
-tl.Title.FontWeight = "bold";
-
-nexttile
-colororder(lines(6))
-col = lines(6);
-box on
-hold on
-for i = 1:nSim
-    for j = 1:css.nSensors
-        litStatus = out.yLitList(j, i);
-
-        if litStatus == 1 % in fov
-            spec = 'o';
-        elseif litStatus == 2 % outside fov
-            spec = 'x';
-        elseif litStatus == 0 % unlit
-            spec = '.';
+if PLOT_SENSOR_MEASUREMENTS
+    % plot magnetic measurement
+    figure('Name', 'Magnetometer');
+    tl = tiledlayout(3, 1);
+    tl.Title.String = "Magnetic Fields (Body)";
+    tl.Title.FontWeight = "bold";
+    
+    out.bList = out.bList.*1e9;
+    
+    nexttile
+    plot(t./60, out.bList(1, :), '-')
+    hold on
+    plot(t./60, out.bList(4, :), 'x')
+    hold off
+    grid on
+    xticklabels({})
+    ylabel('b_x (nT)')
+    ylim('padded')
+    
+    legend('IGRF', 'Mag')
+    
+    nexttile
+    plot(t./60, out.bList(2, :), '-')
+    hold on
+    plot(t./60, out.bList(5, :), 'x')
+    hold off
+    grid on
+    xticklabels({})
+    ylabel('b_y (nT)')
+    ylim('padded')
+    
+    nexttile
+    plot(t./60, out.bList(3, :), '-')
+    hold on
+    plot(t./60, out.bList(6, :), 'x')
+    hold off
+    grid on
+    ylabel('b_z (nT)')
+    ylim('padded')
+    
+    xlabel('t (min)')
+    
+    % plot sun measurements
+    figure('Name', 'Sun Sensors');
+    tl = tiledlayout(4, 1);
+    tl.Title.FontWeight = "bold";
+    
+    nexttile
+    colororder(lines(6))
+    col = lines(6);
+    box on
+    hold on
+    for i = 1:nSim
+        for j = 1:css.nSensors
+            litStatus = out.yLitList(j, i);
+    
+            if litStatus == 1 % in fov
+                spec = 'o';
+            elseif litStatus == 2 % outside fov
+                spec = 'x';
+            elseif litStatus == 0 % unlit
+                spec = '.';
+            end
+    
+            plot(t(i)./60, out.ySList(j, i), spec, 'Color', col(j, :))
         end
-
-        plot(t(i)./60, out.ySList(j, i), spec, 'Color', col(j, :))
     end
+    hold off
+    title('Sun Sensor Measurements')
+    grid on
+    xticklabels({})
+    ylabel('y_s (V)')
+    ylim('padded')
+    hold on
+    legP{1} = plot(nan);
+    legP{2} = plot(nan);
+    legP{3} = plot(nan);
+    legP{4} = plot(nan);
+    legP{5} = plot(nan);
+    legP{6} = plot(nan);
+    
+    legP{7} = plot(nan, 'o', 'Color', 'k');
+    legP{8} = plot(nan, 'x', 'Color', 'k');
+    legP{9} = plot(nan, '.', 'Color', 'k');
+    hold off
+    legend([legP{:}], {'+x', '+y', '+z', '-x', '-y', '-z', 'lit in FOV', 'lit outside FOV', 'unlit'})
+    
+    nexttile
+    plot(t./60, out.sList(1, :), '-')
+    title("Sun Vectors (Body)")
+    hold on
+    plot(t./60, out.sList(4, :), 'x')
+    hold off
+    grid on
+    xticklabels({})
+    ylabel('s_x')
+    ylim('padded')
+    
+    legend('s_r_e_f', 's_c_s_s')
+    
+    nexttile
+    plot(t./60, out.sList(2, :), '-')
+    hold on
+    plot(t./60, out.sList(5, :), 'x')
+    hold off
+    grid on
+    xticklabels({})
+    ylabel('s_y')
+    ylim('padded')
+    
+    nexttile
+    plot(t./60, out.sList(3, :), '-')
+    hold on
+    plot(t./60, out.sList(6, :), 'x')
+    hold off
+    grid on
+    ylabel('s_z')
+    ylim('padded')
+    
+    xlabel('t (min)')
 end
-hold off
-title('Sun Sensor Measurements')
-grid on
-xticklabels({})
-ylabel('y_s (V)')
-ylim('padded')
-hold on
-legP{1} = plot(nan);
-legP{2} = plot(nan);
-legP{3} = plot(nan);
-legP{4} = plot(nan);
-legP{5} = plot(nan);
-legP{6} = plot(nan);
-
-legP{7} = plot(nan, 'o', 'Color', 'k');
-legP{8} = plot(nan, 'x', 'Color', 'k');
-legP{9} = plot(nan, '.', 'Color', 'k');
-hold off
-legend([legP{:}], {'+x', '+y', '+z', '-x', '-y', '-z', 'lit in FOV', 'lit outside FOV', 'unlit'})
-
-nexttile
-plot(t./60, out.sList(1, :), '-')
-title("Sun Vectors (Body)")
-hold on
-plot(t./60, out.sList(4, :), 'x')
-hold off
-grid on
-xticklabels({})
-ylabel('s_x')
-ylim('padded')
-
-legend('s_r_e_f', 's_c_s_s')
-
-nexttile
-plot(t./60, out.sList(2, :), '-')
-hold on
-plot(t./60, out.sList(5, :), 'x')
-hold off
-grid on
-xticklabels({})
-ylabel('s_y')
-ylim('padded')
-
-nexttile
-plot(t./60, out.sList(3, :), '-')
-hold on
-plot(t./60, out.sList(6, :), 'x')
-hold off
-grid on
-ylabel('s_z')
-ylim('padded')
-
-xlabel('t (min)')
 
 % attitude plot
 figure('Name', 'Estimated Attitude')
@@ -396,11 +371,12 @@ title('Angular Error')
 ylabel('\theta error (deg)')
 xlabel('t (min)')
 grid on
+yscale('log')
 
 hold on
-indices = find(sum(out.yLitList == 1) == 3);
+indices = find(sum(out.yLitList == 1) == 3, 1);
 for i = 1:length(indices)
-    xline(t(indices(i))./60)
+    xline(t(indices(i))./60, 'r--', 'LineWidth', 1.5)
 end
 hold off
 

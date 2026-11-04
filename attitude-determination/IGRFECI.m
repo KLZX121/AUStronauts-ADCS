@@ -5,11 +5,14 @@ function bECI = IGRFECI(rECI, jD)
 %   Requires Aerospace Toolbox
 %
 %   Inputs
-%   rECI    (3, 1)  Position in the ECI frame (m)
+%   rECI    (3, 1)  Position in the ECI frame (km)
 %   jD      (1, 1)  Julian date (UTC)
 %
 %   Outputs
 %   bECI    (3, 1)  Magnetic field vector in the ECI frame (T)
+
+% convert orbital pos to m for functions
+rECI = rECI*1e3;
 
 reduction = 'IAU-2000/2006';
 

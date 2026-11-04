@@ -91,6 +91,8 @@ t = t0:h:tf;
 nSim = length(t);
 
 
+results.jD = zeros(1, nSim);
+results.jD(1) = jD0;
 results.qLVLH = zeros(4, nSim);
 results.qLVLH(:, 1) = GetLVLHQ(r0, v0);
 results.x = zeros(nStates, nSim);
@@ -155,6 +157,7 @@ for i = 2:nSim
     x(d.iQ) = x(d.iQ) ./ norm(x(d.iQ));
 
 
+    results.jD(i) = jD;
     results.x(:, i) = x;
     results.TC(:, i) = d.TRW;
     results.qLVLH(:, i) = qLVLH;
@@ -185,6 +188,8 @@ end
 writelines(jsonencode(surfOut), '../results/surfdata.json')
 writelines(jsonencode((results.s .* results.rs)'), '../results/rs.json')
 writelines(jsonencode(geometry), '../results/geometry.json')
+writelines(jsonencode(results.jD), '../results/jd.json')
+writelines(jsonencode(results.inEclipse), '../results/eclipse.json')
 
 %% plot
 

@@ -67,20 +67,18 @@ methods
 
         o.initialised = true;
     end
-    
-    function o = Step(o, dt, q, bRef, uSRef, T, wGyro)
-        %Step Steps the filter forward by one timestep
-        %   o = Step(o, dt, q, bRef, uSRef, T, wGyro)
+
+    function o = Update(o, q, bRef, uSRef, T)
+        %Update Updates the filter states with the measurements
+        %   o = Update(o, q, bRef, uSRef, T)
         %   
         %   Use this function within the simulation loop
         %
         %   Inputs
-        %   dt      (1, 1)      Loop timestep (s)
         %   q       (4, 1)      true attitude quaternion
         %   bRef    (3, 1)      reference magnetic field (ECI)
         %   uSRef   (3, 1)      Reference unit sun vector (ECI)
         %   T       (3, 1)      Current temperature (degC)
-        %   wGyro   (3, 1)      Measured gyro angular velocity (rad/s)
         %
         %   Output
         %   o       (object)    MEKF object instance
@@ -100,7 +98,21 @@ methods
         % quaternion update
         o.qEst = o.qEst + QKinematics([o.qEst; o.xEst(1:3)], struct('iQ', 1:4, 'iWSat', 5:7));
         o.qEst = o.qEst./norm(o.qEst);
-    
+    end
+
+    function o = Propagate(o, dt, wGyro)
+        %Propagate Propagates the filter states using discrete dynamics
+        %   o = Propagate(o, dt, wGyro)
+        %   
+        %   Use this function within the simulation loop
+        %
+        %   Inputs
+        %   dt      (1, 1)      Loop timestep (s)
+        %   wGyro   (3, 1)      Measured gyro angular velocity (rad/s)
+        %
+        %   Output
+        %   o       (object)    MEKF object instance
+
         % propagate dynamics
         o.wEst = o.wEstFn(wGyro);
         [o.F, o.G] = o.StateMatrices();
@@ -108,7 +120,7 @@ methods
         o.P = o.PropPDisc(o.P, o.F, o.G, o.Q, o.nStates, dt);
         o.qEst = o.PropQDisc(o.qEst, o.wEst, dt);
     end
-
+    
     function [y, h, H, R] = MeasurementMatrices(o, q, bRef, uSRef, T)
         yMag = o.mag.Measurement(q, bRef, true);
         [hMag, HMag] = o.mag.MEKFMatrices(o.qEst, bRef, o.nStates);

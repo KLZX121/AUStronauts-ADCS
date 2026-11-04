@@ -16,7 +16,7 @@ end
 
 
 
-n = 1000;
+n = 10;
 
 CSSTRIADSig(n)
 
@@ -143,8 +143,8 @@ function [lit,thetaErrList,nLitList, sig1, sig2, sigmag] = RunOrbit
 el(2) = el(2) + deg2rad(10)*randn;
 
 [rOrb, vOrb, tOrb] = RVFromKepler(el);
-rOrb = rOrb.*1e3;
-vOrb = vOrb.*1e3;
+rOrb = rOrb;
+vOrb = vOrb;
 
 r0 = rOrb(:, 1);
 v0 = vOrb(:, 1);
