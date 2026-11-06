@@ -114,11 +114,11 @@ results.surfForces(1:nSim) = surfForce;
 results.s = zeros(3, nSim);
 results.rs = zeros(1, nSim);
 [results.s(:, 1), results.rs(1)] = SunV1(jD0, r0);
-results.inEclipse = zeros(1, nSim);
+results.inEclipse = zeros(nSim, 1);
 
 x = x0;
 
-tic
+t0Sim = tic;
 for i = 2:nSim
     jD = jD0 + t(i)/86400;
 
@@ -167,12 +167,14 @@ for i = 2:nSim
     results.rs(i) = rs;
     results.inEclipse(i) = env.inEclipse;
 end
-toc
+tSim = toc(t0Sim);
+fprintf("Simulation completed in %f s\n", tSim)
 
 
 %d.TExt = zeros(3, 1);
 %out = RK4Convergence(x0, xDotFn, d, 8, 6, struct("t0", t0, "tf", tf, "h0", 10));
 
+t0Data = tic;
 
 % write results to files
 if ~exist('../results', 'dir')
@@ -196,36 +198,6 @@ writelines(jsonencode(results.inEclipse), '../results/eclipse.json')
 % convert time to minutes
 t = t./60;
 
-% plot eclipse
-patchXIncs = [];
-xStart = 0;
-for i = 1:nSim
-    if ~results.inEclipse(i) || i == nSim
-        if xStart ~= 0
-            xInc = [xStart, t(i), t(i), xStart];
-            patchXIncs(end+1, :) = xInc;
-            xStart = 0;
-        end
-        continue
-    end
-
-    if xStart == 0
-        xStart = t(i);
-    end
-end
-
-function patchEclipse(patchXIncs)
-    hold on
-    yl = ylim;
-    ylim(yl);
-    yInc = [min(ylim), min(ylim), max(ylim), max(ylim)];
-    for i = 1:size(patchXIncs, 1)
-        patch(patchXIncs(i,:), yInc, [0.5 0.5 0.5], 'FaceAlpha', 0.2, 'EdgeColor', 'none', 'HandleVisibility', 'off');
-    end
-
-    hold off
-end
-
 
 figure('Name', 'State Variables');
 tl = tiledlayout(4, 2);
@@ -239,7 +211,7 @@ grid on
 ylabel('r (km)')
 ylim('padded')
 
-patchEclipse(patchXIncs)
+PlotEclipsePatch(results.inEclipse, t)
 
 nexttile
 plot(t, results.x(d.iV, :))
@@ -248,7 +220,7 @@ grid on
 ylabel('v (km/s)')
 ylim('padded')
 
-patchEclipse(patchXIncs)
+PlotEclipsePatch(results.inEclipse, t)
 
 nexttile([2 1])
 plot(t, results.x(d.iQ, :))
@@ -257,7 +229,7 @@ grid on
 ylabel('q')
 ylim('padded')
 
-patchEclipse(patchXIncs)
+PlotEclipsePatch(results.inEclipse, t)
 
 nexttile([2 1])
 plot(t, results.x(d.iWSat, :))
@@ -266,7 +238,7 @@ grid on
 ylabel('\omega_s_a_t (rad/s)')
 ylim('padded')
 
-patchEclipse(patchXIncs)
+PlotEclipsePatch(results.inEclipse, t)
 
 nexttile
 plot(t, results.x(d.iWRW, :))
@@ -275,7 +247,7 @@ grid on
 ylabel('\omega_r_w (rad/s)')
 ylim('padded')
 
-patchEclipse(patchXIncs)
+PlotEclipsePatch(results.inEclipse, t)
 
 nexttile
 plot(t, results.TC)
@@ -285,7 +257,7 @@ grid on
 ylabel('T_r_w (N/m)')
 ylim('padded')
 
-patchEclipse(patchXIncs)
+PlotEclipsePatch(results.inEclipse, t)
 
 xlabel('t (min)')
 
@@ -374,7 +346,7 @@ title('SRP')
 ylabel('T_s (N m)')
 grid on
 
-patchEclipse(patchXIncs)
+PlotEclipsePatch(results.inEclipse, t)
 
 nexttile
 plot(t, [results.dist.m])
@@ -382,3 +354,6 @@ title('Magnetic Field')
 ylabel('T_m (N m)')
 xlabel('t (min)')
 grid on
+
+tData = toc(t0Data);
+fprintf("Data writing and plotting completed in %f s\n", tData)
