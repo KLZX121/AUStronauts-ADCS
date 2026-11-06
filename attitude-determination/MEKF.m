@@ -68,23 +68,25 @@ methods
         o.initialised = true;
     end
 
-    function o = Update(o, q, bRef, uSRef, T)
+    function o = Update(o, q, env)
         %Update Updates the filter states with the measurements
-        %   o = Update(o, q, bRef, uSRef, T)
+        %   o = Update(o, q, env)
         %   
         %   Use this function within the simulation loop
         %
         %   Inputs
-        %   q       (4, 1)      true attitude quaternion
-        %   bRef    (3, 1)      reference magnetic field (ECI)
-        %   uSRef   (3, 1)      Reference unit sun vector (ECI)
-        %   T       (3, 1)      Current temperature (degC)
+        %   q           (4, 1)      True attitude quaternion
+        %   env         (struct)    Environmental data struct
+        %   .bRef       (3, 1)      Reference magnetic field (ECI)
+        %   .uSRef      (3, 1)      Reference unit sun vector (ECI)
+        %   .T          (3, 1)      Current temperature (degC)
+        %   .inEclipse  (bool)      Whether satellite is in eclipse
         %
         %   Output
-        %   o       (object)    MEKF object instance
+        %   o           (object)    MEKF object instance
 
         % simulate measurement
-        [o.y, o.h, o.H, o.R] = o.MeasurementMatrices(q, bRef, uSRef, T);
+        [o.y, o.h, o.H, o.R] = o.MeasurementMatrices(q, env);
     
         % calculate gain
         o.K = o.P*o.H' / (o.H*o.P*o.H' + o.R);
@@ -121,16 +123,33 @@ methods
         o.qEst = o.PropQDisc(o.qEst, o.wEst, dt);
     end
     
-    function [y, h, H, R] = MeasurementMatrices(o, q, bRef, uSRef, T)
-        yMag = o.mag.Measurement(q, bRef, true);
-        [hMag, HMag] = o.mag.MEKFMatrices(o.qEst, bRef, o.nStates);
+    function [y, h, H, R] = MeasurementMatrices(o, q, env)
+        %MeasurementMatrices Simulates measurements and compiles matrices
+        %   [y, h, H, R] = MeasurementMatrices(o, q, env)
+        %
+        %   Inputs
+        %   q           (4, 1)      True attitude quaternion
+        %   env         (struct)    Environmental data struct
+        %   .bRef       (3, 1)      Reference magnetic field (ECI)
+        %   .uSRef      (3, 1)      Reference unit sun vector (ECI)
+        %   .T          (3, 1)      Current temperature (degC)
+        %   .inEclipse  (bool)      Whether satellite is in eclipse
+        %
+        %   Outputs
+        %   y           (:, 1)      Sensor measurements [mag; css]
+        %   h           (:, :)      Estimated measurements
+        %   H           (:, :)      Measurement sensitivity matrix
+        %   R           (:, :)      Measurement covariance matrix
 
-        yCSS = o.css.Measurement(q, uSRef, T, true);
+        yMag = o.mag.Measurement(q, env.bRef, true);
+        [hMag, HMag] = o.mag.MEKFMatrices(o.qEst, env.bRef, o.nStates);
+
+        yCSS = o.css.Measurement(q, env, true);
         % filter in-fov sensors
         inFOV = find(yCSS >= o.css.yFov);
         yCSS = yCSS(inFOV);
 
-        [hCSS, HCSS] = o.css.MEKFMatrices(o.qEst, uSRef, T, o.nStates, inFOV);
+        [hCSS, HCSS] = o.css.MEKFMatrices(o.qEst, env, o.nStates, inFOV);
 
         y = [yMag; yCSS;];
         h = [hMag; hCSS;];

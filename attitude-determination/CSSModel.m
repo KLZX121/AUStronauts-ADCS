@@ -85,17 +85,19 @@ methods
         o.sigmaYFov = o.sigmaYFn(o.thetaFov);
     end
 
-    function [y, yLit] = Measurement(o, q, uSunRef, T, genNoise)
+    function [y, yLit] = Measurement(o, q, env, genNoise)
         %Measurement Simulates sun sensor measurements
-        %   [y, yLit] = Measurement(o, q, uSunRef, T, genNoise)
+        %   [y, yLit] = Measurement(o, q, env, genNoise)
         %
         %   Simulates measurements considering temperature and noise using 
         %   a LUT. Does not consider interference sources like albedo
         %   
         %   Inputs
         %   q           (4, 1)  True attitude quaternion
-        %   uSunRef     (3, 1)  True unit sun vector in reference frame (ECI)
-        %   T           (1, 1)  Current temperature (degC)
+        %   env         (struct)    Environmental data struct
+        %   .uSRef     (3, 1)  True unit sun vector in reference frame (ECI)
+        %   .T           (1, 1)  Current temperature (degC)
+        %   .inEclipse   (bool)  Whether satellite is in eclipse
         %   genNoise    (bool)  Whether to generate measurement noise
         %
         %   Outputs
@@ -106,14 +108,14 @@ methods
         %                       unlit = 0
 
         % rotate sun reference vector to body frame
-        uSunBody = QToDCM(q)*uSunRef;
+        uSunBody = QToDCM(q)*env.uSRef;
         
         % get true incidence angle      
         cosThetas = clip(o.uSensors' * uSunBody, -1, 1);
         trueThetas = acos(cosThetas);
 
         % temp offset
-        yTOffset = o.alpha*(T - o.T0);
+        yTOffset = o.alpha*(env.T - o.T0);
 
         % sensor illumination status
         yLit = zeros(6, 1);
@@ -125,7 +127,7 @@ methods
             sigmaY = zeros(o.nSensors, 1);
         end
         for i = 1:o.nSensors
-            if (cosThetas(i) >= o.cosFov)
+            if ~env.inEclipse && (cosThetas(i) >= o.cosFov)
                 % if sun is within fov
 
                 % use LUT and pchip interpolation
@@ -140,7 +142,7 @@ methods
                 end
 
                 yLit(i) = 1;
-            elseif (cosThetas(i) > 0)
+            elseif ~env.inEclipse && (cosThetas(i) > 0)
                 % if sun is outside fov but within 90 deg
 
                 % find amplitude of cosine by generating continuous
@@ -156,7 +158,7 @@ methods
 
                 yLit(i) = 2;
             else
-                % sun is towards back-side of sensor
+                % sun is towards back-side of sensor or in eclipse
                 y(i) = 0;
 
                 if (genNoise)
@@ -223,7 +225,7 @@ methods
         uS = uS./norm(uS);
     end
 
-    function [h, H] = MEKFMatrices(o, qEst, uSunRef, T, nStates, sensorI)
+    function [h, H] = MEKFMatrices(o, qEst, env, nStates, sensorI)
         %MEKFMatrices Calculates estimated measurements for MEKF
         %   [h, H] = MEKFMatrices(o, qEst, uSunRef, T, nStates, sensorI)
         %
@@ -231,26 +233,28 @@ methods
         %   specified.
         %
         %   Inputs
-        %   qEst        (4, 1)  Estimated quaternion
-        %   uSunRef     (3, 1)  Unit true reference Sun vector (ECI)
-        %   T           (1, 1)  Current temperature (degC)
-        %   nStates     (1, 1)  Number of filter states
-        %   sensorI     (:, 1)  Indices of sensor to get (optional)
+        %   qEst        (4, 1)      Estimated quaternion
+        %   env         (struct)    Environmental data
+        %   .uSRef      (3, 1)      Unit true reference Sun vector (ECI)
+        %   .T          (1, 1)      Current temperature (degC)
+        %   .inEclipse  (bool)      Whether satellite is in eclipse
+        %   nStates     (1, 1)      Number of filter states
+        %   sensorI     (:, 1)      Indices of sensor to get (optional)
         %
         %   Outputs
-        %   h           (:, 1)  Estimated measurement
-        %   H           (:, :)  Measurement sensitivity matrix
+        %   h           (:, 1)      Estimated measurement
+        %   H           (:, :)      Measurement sensitivity matrix
 
-        h = o.Measurement(qEst, uSunRef, T, false);
+        h = o.Measurement(qEst, env, false);
 
         uCSS = o.uSensors;
         
-        if (nargin > 5)
+        if exist('sensorI', 'var')
             uCSS = uCSS(:, sensorI);
             h = h(sensorI);
         end
         
-        uSunEst = QToDCM(qEst)*uSunRef;
+        uSunEst = QToDCM(qEst)*env.uSRef;
         
         thetaEst = acos(uCSS' * uSunEst);
 
@@ -258,7 +262,7 @@ methods
 
         H = -dy.*(uCSS'*Skew(uSunEst))./sin(thetaEst);
 
-        if (nargin > 5)
+        if exist('sensorI', 'var')
             H = [H zeros(length(sensorI), nStates-3)];
         else
             H = [H zeros(o.nSensors, nStates-3)];

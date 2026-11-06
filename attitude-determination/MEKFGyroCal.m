@@ -57,7 +57,7 @@ methods(Static)
         %   Plot(t, xErrList, sigma3List)
         %   
         %   Inputs
-        %   t           (1, :)      List of timesteps (s)
+        %   t           (1, :)      List of timesteps (min)
         %   xErrList    (n, :)      List of error states
         %   sigma3List  (n, :)      List of 3-sigma bounds
 
@@ -86,7 +86,7 @@ methods(Static)
             sigma3List(13:15, :);
         };
         figData.xLabel = "t (min)";
-        figData.x = t./60;
+        figData.x = t;
 
         MEKF.Plot(figData)
     end
