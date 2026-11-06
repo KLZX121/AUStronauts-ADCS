@@ -15,6 +15,9 @@ end
 if isempty(which('QProd'))
     addpath(genpath('../common'));
 end
+if isempty(which('MagModel'))
+    addpath(genpath('../sensors'));
+end
 
 %% read data
 xData = jsondecode(readlines('../results/xdata.json', 'EmptyLineRule','skip'))';

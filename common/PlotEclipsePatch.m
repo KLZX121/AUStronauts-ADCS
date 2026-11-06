@@ -29,7 +29,8 @@ function PlotEclipsePatch(eclipseData, t)
     patchY = repmat([yl(1); yl(1); yl(2); yl(2)], 1, numel(iStart));
 
     patch(patchX, patchY, [0.5 0.5 0.5], 'FaceAlpha', 0.2, ...
-        'EdgeColor', 'none', 'HandleVisibility', 'off');
+        'EdgeColor', 'none', 'HandleVisibility', 'off', 'PickableParts', ...
+        'none', 'HitTest', 'off');
 
     hold off
 
