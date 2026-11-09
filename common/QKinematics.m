@@ -1,6 +1,6 @@
 function qDot = QKinematics(x, d)
 %QKinematics Quaternion Kinematics ODE
-%   qDot = QKinematics(q, omega)
+%   qDot = QKinematics(x, d)
 %   
 %   Inputs
 %   x       (:, 1)  State vector

@@ -17,7 +17,8 @@ function [T, surfData] = DisturbanceTorques(x, d, env, geom, shadowing)
 %   .rho        (1, 1)      Atmospheric density (kg m^-3)
 %   .p          (1, 1)      Total Solar Radiation Pressure (N/m^2)
 %   .s          (3, 1)      Unit Sun vector (ECI)
-%   B           (3, 1)      Ambient magnetic field (T) (ECI)
+%   .B          (3, 1)      Ambient magnetic field (T) (ECI)
+%   .inEclipse  (bool)      Whether satellite is in eclipse
 %   geom        (struct)    Satellite geometry struct
 %   .n_surfaces (1, 1)      Number of surfaces
 %   .surfaces   (struct[])  Array of rectangular surface objects
@@ -79,7 +80,11 @@ for i = 1:geom.n_surfaces
     % force
     fAero = (-vHat).*0.5*env.rho*vMag^2*ApAero*surf.Cd;
 
-    fSRP = -env.p*ApSRP*((surf.Ca + surf.Crd)*s + (2/3*surf.Crd + 2*surf.Crs*cosThetaSRP)*surf.normal);
+    if ~env.inEclipse
+        fSRP = -env.p*ApSRP*((surf.Ca + surf.Crd)*s + (2/3*surf.Crd + 2*surf.Crs*cosThetaSRP)*surf.normal);
+    else
+        fSRP = zeros(3, 1);
+    end
 
     if shadowing
         if ApAero ~= 0
@@ -88,7 +93,7 @@ for i = 1:geom.n_surfaces
                 fAero = zeros(3, 1);
             end
         end
-        if ApSRP ~= 0
+        if ~env.inEclipse && ApSRP ~= 0
             isSRPShadowed = CheckShadowing(s, surf, geom.surfaces);
             if isSRPShadowed
                 fSRP = zeros(3, 1);

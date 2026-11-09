@@ -16,11 +16,13 @@ if isempty(which('PropState'))
     addpath(genpath('../common'));
 end
 
+DO_SHADOWING = true;
+USE_SUBDIVIDED_GEOMETRY = true;
+
 %% initial states
 
 % orbital elements to find initial pos and vel
-% TODO: switch to using meters and rewrite relevant functions
-[el, jD0] = ISSOrbit('fixed');
+[el, jD0] = ISSOrbit('high');
 [r0, v0] = El2RV(el); % [km, km/s]
 
 % attitude quaternion
@@ -45,7 +47,6 @@ nStates = 16;
 
 % data struct
 % TODO: define in separate file?
-% TODO: define body frame (sct has z-axis longitudinal)
 % satellite moi
 d.ISat = InertiaCubeSat('3U', 6);
 
@@ -70,7 +71,11 @@ d.iWSat = 11:13;
 d.iWRW = 14:16;
 
 % satellite geometry
-geometry = jsondecode(fileread('../geometry.json'));
+if USE_SUBDIVIDED_GEOMETRY
+    geometry = jsondecode(fileread('../subgeometry.json'));
+else
+    geometry = jsondecode(fileread('../geometry.json'));
+end
 
 %% plant
 
@@ -92,6 +97,8 @@ t = t0:h:tf;
 nSim = length(t);
 
 
+results.jD = zeros(1, nSim);
+results.jD(1) = jD0;
 results.qLVLH = zeros(4, nSim);
 results.qLVLH(:, 1) = GetLVLHQ(r0, v0);
 results.x = zeros(nStates, nSim);
@@ -113,13 +120,29 @@ results.surfForces(1:nSim) = surfForce;
 results.s = zeros(3, nSim);
 results.rs = zeros(1, nSim);
 [results.s(:, 1), results.rs(1)] = SunV1(jD0, r0);
+results.inEclipse = zeros(nSim, 1);
 
 x = x0;
 
-tic
+t0Sim = tic;
 for i = 2:nSim
+    jD = jD0 + t(i)/86400;
+
+    % environmental data
+    % TODO: get environmental densities
+    % TODO: get srp
+    [env.s, rs] = SunV1(jD, x(d.iR));
+    env.B = BDipole(x(d.iR), jD);
+    env.rho = 3.8e-12; % kg m^-3
+    env.p = 4.5e-6; % N m^-2
+
+    % determine if in eclipse
+    env.inEclipse = CheckEclipse(x(d.iR), env.s*rs);
+
     % lvlh
     qLVLH = GetLVLHQ(x(d.iR), x(d.iV));
+
+
 
     % compute control torque
     if i == 2 || mod(i*h,d.controlHZ) == 0
@@ -127,16 +150,10 @@ for i = 2:nSim
         %d.TRW = -TC;
     end
 
-    % compute disturbances
-    % TODO: get environmental densities
-    % TODO: get srp
-    jD = jD0 + t(i)/86400;
-    [env.s, rs] = SunV1(jD, x(d.iR));
-    env.B = BDipole(x(d.iR), jD);
-    env.rho = 3.8e-12; % kg m^-3
-    env.p = 4.5e-6; % N m^-2
 
-    [distT, distSurf] = DisturbanceTorques(x, d, env, geometry, true);
+
+    % compute disturbances
+    [distT, distSurf] = DisturbanceTorques(x, d, env, geometry, DO_SHADOWING);
     d.TExt = distT.g + distT.a + distT.s + distT.m;
 
 
@@ -146,6 +163,7 @@ for i = 2:nSim
     x(d.iQ) = x(d.iQ) ./ norm(x(d.iQ));
 
 
+    results.jD(i) = jD;
     results.x(:, i) = x;
     results.TC(:, i) = d.TRW;
     results.qLVLH(:, i) = qLVLH;
@@ -153,13 +171,16 @@ for i = 2:nSim
     results.surfForces(i) = distSurf;
     results.s(:, i) = env.s;
     results.rs(i) = rs;
+    results.inEclipse(i) = env.inEclipse;
 end
-toc
+tSim = toc(t0Sim);
+fprintf("Simulation completed in %f s\n", tSim)
 
 
 %d.TExt = zeros(3, 1);
 %out = RK4Convergence(x0, xDotFn, d, 8, 6, struct("t0", t0, "tf", tf, "h0", 10));
 
+t0Data = tic;
 
 % write results to files
 if ~exist('../results', 'dir')
@@ -174,11 +195,15 @@ for i = 1:nSim
 end
 writelines(jsonencode(surfOut), '../results/surfdata.json')
 writelines(jsonencode((results.s .* results.rs)'), '../results/rs.json')
+writelines(jsonencode(geometry), '../results/geometry.json')
+writelines(jsonencode(results.jD), '../results/jd.json')
+writelines(jsonencode(results.inEclipse), '../results/eclipse.json')
 
 %% plot
 
 % convert time to minutes
 t = t./60;
+
 
 figure('Name', 'State Variables');
 tl = tiledlayout(4, 2);
@@ -192,12 +217,16 @@ grid on
 ylabel('r (km)')
 ylim('padded')
 
+PlotEclipsePatch(results.inEclipse, t)
+
 nexttile
 plot(t, results.x(d.iV, :))
 legend('v_x', 'v_y', 'v_z')
 grid on
 ylabel('v (km/s)')
 ylim('padded')
+
+PlotEclipsePatch(results.inEclipse, t)
 
 nexttile([2 1])
 plot(t, results.x(d.iQ, :))
@@ -206,12 +235,16 @@ grid on
 ylabel('q')
 ylim('padded')
 
+PlotEclipsePatch(results.inEclipse, t)
+
 nexttile([2 1])
 plot(t, results.x(d.iWSat, :))
 legend('\omega_x', '\omega_y', '\omega_z')
 grid on
 ylabel('\omega_s_a_t (rad/s)')
 ylim('padded')
+
+PlotEclipsePatch(results.inEclipse, t)
 
 nexttile
 plot(t, results.x(d.iWRW, :))
@@ -220,6 +253,8 @@ grid on
 ylabel('\omega_r_w (rad/s)')
 ylim('padded')
 
+PlotEclipsePatch(results.inEclipse, t)
+
 nexttile
 plot(t, results.TC)
 title('Command Torques')
@@ -227,6 +262,8 @@ legend('T_x', 'T_y', 'T_z')
 grid on
 ylabel('T_r_w (N/m)')
 ylim('padded')
+
+PlotEclipsePatch(results.inEclipse, t)
 
 xlabel('t (min)')
 
@@ -315,9 +352,14 @@ title('SRP')
 ylabel('T_s (N m)')
 grid on
 
+PlotEclipsePatch(results.inEclipse, t)
+
 nexttile
 plot(t, [results.dist.m])
 title('Magnetic Field')
 ylabel('T_m (N m)')
 xlabel('t (min)')
 grid on
+
+tData = toc(t0Data);
+fprintf("Data writing and plotting completed in %f s\n", tData)
