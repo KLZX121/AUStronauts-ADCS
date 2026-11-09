@@ -16,10 +16,12 @@ if isempty(which('PropState'))
     addpath(genpath('../common'));
 end
 
+DO_SHADOWING = true;
+USE_SUBDIVIDED_GEOMETRY = true;
+
 %% initial states
 
 % orbital elements to find initial pos and vel
-% TODO: switch to using meters and rewrite relevant functions
 [el, jD0] = ISSOrbit('high');
 [r0, v0] = El2RV(el); % [km, km/s]
 
@@ -69,7 +71,11 @@ d.iWSat = 11:13;
 d.iWRW = 14:16;
 
 % satellite geometry
-geometry = jsondecode(fileread('../subgeometry.json'));
+if USE_SUBDIVIDED_GEOMETRY
+    geometry = jsondecode(fileread('../subgeometry.json'));
+else
+    geometry = jsondecode(fileread('../geometry.json'));
+end
 
 %% plant
 
@@ -147,7 +153,7 @@ for i = 2:nSim
 
 
     % compute disturbances
-    [distT, distSurf] = DisturbanceTorques(x, d, env, geometry, false);
+    [distT, distSurf] = DisturbanceTorques(x, d, env, geometry, DO_SHADOWING);
     d.TExt = distT.g + distT.a + distT.s + distT.m;
 
 

@@ -228,6 +228,9 @@ end
 tSim = toc;
 fprintf("Simulation completed in %f s\n", tSim)
 
+% write est q
+writelines(jsonencode(out.qList(5:8, :)'), '../results/qest.json')
+
 %% plots
 t = t./60;
 tic
