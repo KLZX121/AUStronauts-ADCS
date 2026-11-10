@@ -54,7 +54,7 @@ end
 methods(Static)
     function Plot(t, xErrList, sigma3List, plotType)
         %Plot Plots the state errors over time, as well as 3-sigma bounds
-        %   Plot(t, xErrList, sigma3List)
+        %   Plot(t, xErrList, sigma3List, plotType)
         %   
         %   Inputs
         %   t           (1, :)      List of timesteps (min)
@@ -62,33 +62,37 @@ methods(Static)
         %   sigma3List  (n, :)      List of 3-sigma bounds
         %   plotType    (str)       'overview' or 'detailed'
 
+        yLabels = [
+            "\delta\vartheta (deg)";
+            "\Delta\beta (deg/h)";
+            "\Deltas"; 
+            "\Deltak_U"; 
+            "\Deltak_L"
+        ];
+        y = {
+            rad2deg(xErrList(1:3,:));
+            rad2deg(xErrList(4:6, :)).*3600;
+            xErrList(7:9, :);
+            xErrList(10:12, :);
+            xErrList(13:15, :);
+        };
+        sig3 = {
+            rad2deg(sigma3List(1:3, :));
+            rad2deg(sigma3List(4:6, :)).*3600;
+            sigma3List(7:9, :);
+            sigma3List(10:12, :);
+            sigma3List(13:15, :);
+        };
+
         if plotType == "overview"
-            figData.figName = "Gyro Calibration MEKF";
+            figData.figName = "MEKF (15-state)";
             figData.plotType = plotType;
 
             figData.tlDim = [3, 2];
             figData.plotSizes = [[1 2]; repmat([1 1], 4, 1)];
-            figData.yLabels = [
-                "\delta\vartheta (deg)"; 
-                "\Delta\beta (deg/h)"; 
-                "\Deltas"; 
-                "\Deltak_U"; 
-                "\Deltak_L"
-            ];
-            figData.y = {
-                rad2deg(xErrList(1:3,:));
-                rad2deg(xErrList(4:6, :)).*3600;
-                xErrList(7:9, :);
-                xErrList(10:12, :);
-                xErrList(13:15, :);
-            };
-            figData.sigma3s = {
-                rad2deg(sigma3List(1:3, :));
-                rad2deg(sigma3List(4:6, :)).*3600;
-                sigma3List(7:9, :);
-                sigma3List(10:12, :);
-                sigma3List(13:15, :);
-            };
+            figData.yLabels = yLabels;
+            figData.y = y;
+            figData.sigma3s = sig3;
 
             figData.xLabel = "t (min)";
             figData.x = t;
@@ -102,27 +106,6 @@ methods(Static)
                 "MEKF Gyro Upper Misalignment Error";
                 "MEKF Gyro Lower Misalignment Error";
             ];
-            yLabels = [
-                "\delta\vartheta (deg)";
-                "\Delta\beta (deg/h)";
-                "\Deltas"; 
-                "\Deltak_U"; 
-                "\Deltak_L"
-            ];
-            y = {
-                rad2deg(xErrList(1:3,:));
-                rad2deg(xErrList(4:6, :)).*3600;
-                xErrList(7:9, :);
-                xErrList(10:12, :);
-                xErrList(13:15, :);
-            };
-            sig3 = {
-                rad2deg(sigma3List(1:3, :));
-                rad2deg(sigma3List(4:6, :)).*3600;
-                sigma3List(7:9, :);
-                sigma3List(10:12, :);
-                sigma3List(13:15, :);
-            };
 
             for i = 1:length(figNames)
                 figData.figName = figNames(i);
