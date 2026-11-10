@@ -15,6 +15,9 @@ end
 if isempty(which('PropState'))
     addpath(genpath('../common'));
 end
+if isempty(which('IGRFECI'))
+    addpath(genpath('../environment'));
+end
 
 DO_SHADOWING = true;
 USE_SUBDIVIDED_GEOMETRY = true;
@@ -129,11 +132,10 @@ for i = 2:nSim
     jD = jD0 + t(i)/86400;
 
     % environmental data
-    % TODO: get environmental densities
     % TODO: get srp
     [env.s, rs] = SunV1(jD, x(d.iR));
-    env.B = BDipole(x(d.iR), jD);
-    env.rho = 3.8e-12; % kg m^-3
+    env.B = IGRFECI(x(d.iR), jD);
+    env.rho = AtmosphericDensity(x(d.iR), jD); % kg m^-3
     env.p = 4.5e-6; % N m^-2
 
     % determine if in eclipse

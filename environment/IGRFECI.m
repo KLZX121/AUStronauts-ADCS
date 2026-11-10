@@ -6,7 +6,7 @@ function bECI = IGRFECI(rECI, jD)
 %
 %   Inputs
 %   rECI    (3, 1)  Position in the ECI frame (km)
-%   jD      (1, 1)  Julian date (UTC)
+%   jD      (1, 1)  Julian date
 %
 %   Outputs
 %   bECI    (3, 1)  Magnetic field vector in the ECI frame (T)

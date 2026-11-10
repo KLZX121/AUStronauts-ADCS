@@ -18,6 +18,9 @@ end
 if isempty(which('MagModel'))
     addpath(genpath('../sensors'));
 end
+if isempty(which('IGRFECI'))
+    addpath(genpath('../environment'));
+end
 
 %% read data
 xData = jsondecode(readlines('../results/xdata.json', 'EmptyLineRule','skip'))';
