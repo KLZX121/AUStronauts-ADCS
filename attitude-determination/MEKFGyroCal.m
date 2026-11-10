@@ -52,7 +52,7 @@ methods(Access=protected)
     end
 end
 methods(Static)
-    function Plot(t, xErrList, sigma3List)
+    function Plot(t, xErrList, sigma3List, plotType)
         %Plot Plots the state errors over time, as well as 3-sigma bounds
         %   Plot(t, xErrList, sigma3List)
         %   
@@ -60,35 +60,98 @@ methods(Static)
         %   t           (1, :)      List of timesteps (min)
         %   xErrList    (n, :)      List of error states
         %   sigma3List  (n, :)      List of 3-sigma bounds
+        %   plotType    (str)       'overview' or 'detailed'
 
-        figData.figName = "Gyro Calibration MEKF";
-        figData.tlDim = [3, 2];
-        figData.plotSizes = [[1 2]; repmat([1 1], 4, 1)];
-        figData.yLabels = [
-            "\delta\vartheta (deg)"; 
-            "\Delta\beta (deg/h)"; 
-            "\Deltas"; 
-            "\Deltak_U"; 
-            "\Deltak_L"
-        ];
-        figData.y = {
-            rad2deg(xErrList(1:3,:));
-            rad2deg(xErrList(4:6, :)).*3600;
-            xErrList(7:9, :);
-            xErrList(10:12, :);
-            xErrList(13:15, :);
-        };
-        figData.sigma3s = {
-            rad2deg(sigma3List(1:3, :));
-            rad2deg(sigma3List(4:6, :)).*3600;
-            sigma3List(7:9, :);
-            sigma3List(10:12, :);
-            sigma3List(13:15, :);
-        };
-        figData.xLabel = "t (min)";
-        figData.x = t;
+        if plotType == "overview"
+            figData.figName = "Gyro Calibration MEKF";
+            figData.plotType = plotType;
 
-        MEKF.Plot(figData)
+            figData.tlDim = [3, 2];
+            figData.plotSizes = [[1 2]; repmat([1 1], 4, 1)];
+            figData.yLabels = [
+                "\delta\vartheta (deg)"; 
+                "\Delta\beta (deg/h)"; 
+                "\Deltas"; 
+                "\Deltak_U"; 
+                "\Deltak_L"
+            ];
+            figData.y = {
+                rad2deg(xErrList(1:3,:));
+                rad2deg(xErrList(4:6, :)).*3600;
+                xErrList(7:9, :);
+                xErrList(10:12, :);
+                xErrList(13:15, :);
+            };
+            figData.sigma3s = {
+                rad2deg(sigma3List(1:3, :));
+                rad2deg(sigma3List(4:6, :)).*3600;
+                sigma3List(7:9, :);
+                sigma3List(10:12, :);
+                sigma3List(13:15, :);
+            };
+
+            figData.xLabel = "t (min)";
+            figData.x = t;
+
+            MEKF.Plot(figData)
+        elseif plotType == "detailed"
+            figNames = [
+                "MEKF Attitude Error";
+                "MEKF Gyro Bias Error";
+                "MEKF Gyro Scale Factor Error";
+                "MEKF Gyro Upper Misalignment Error";
+                "MEKF Gyro Lower Misalignment Error";
+            ];
+            yLabels = [
+                "\delta\vartheta (deg)";
+                "\Delta\beta (deg/h)";
+                "\Deltas"; 
+                "\Deltak_U"; 
+                "\Deltak_L"
+            ];
+            y = {
+                rad2deg(xErrList(1:3,:));
+                rad2deg(xErrList(4:6, :)).*3600;
+                xErrList(7:9, :);
+                xErrList(10:12, :);
+                xErrList(13:15, :);
+            };
+            sig3 = {
+                rad2deg(sigma3List(1:3, :));
+                rad2deg(sigma3List(4:6, :)).*3600;
+                sigma3List(7:9, :);
+                sigma3List(10:12, :);
+                sigma3List(13:15, :);
+            };
+
+            for i = 1:length(figNames)
+                figData.figName = figNames(i);
+                figData.plotType = plotType;
+    
+                figData.tlDim = [3, 1];
+                figData.plotSizes = repmat([1 1], 3, 1);
+                figData.yLabels = [
+                    sprintf("X %s", yLabels(i));
+                    sprintf("Y %s", yLabels(i))
+                    sprintf("Z %s", yLabels(i))
+                ];
+                figData.y = {
+                    y{i}(1, :);
+                    y{i}(2, :);
+                    y{i}(3, :);
+                };
+                figData.sigma3s = {
+                    sig3{i}(1, :);
+                    sig3{i}(2, :);
+                    sig3{i}(3, :);
+                };
+    
+                figData.xLabel = "t (min)";
+                figData.x = t;
+    
+                MEKF.Plot(figData)
+            end
+        end
     end
 end
 end

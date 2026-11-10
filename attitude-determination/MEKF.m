@@ -224,26 +224,32 @@ methods(Static)
         %   Plot(figData)
         %   
         %   Inputs
-        %   t           (1, :)      List of timesteps (s)
-        %   xErrList    (n, :)      List of error states
-        %   sigma3List  (n, :)      List of 3-sigma bounds
-        %   figData     (struct)    Information to create the figure
-        %   .figName    (string)    Name of figure
+        %   figData     struct      Information to create the figure
+        %   .plotType   string      Level of detail of plot ('overview' or
+        %                           'detailed')
+        %   .figName    string      Name of figure
         %   .tlDim      (2, 1)      Number of [rows, cols] of tiledlayout
-        %   .plotSizes  (n/3, 2)    Number of tiles that each plot takes up
+        %   .plotSizes  (n, 2)      Number of tiles that each plot takes up
         %                           [1 1] for 1 row, 1 col
         %                           [1 2] for 1 row, 2 col etc.
-        %   .yLabels    (n/3, 1)    String array of plot y-axis labels
+        %   .yLabels    (n, 1)      String array of plot y-axis labels
         %   .xLabel     string      x-axis label for all plots
-        %   .y          {n/3, 1}    Cell array of state errors to plot
-        %   .sigma3s    {n/3, 1}    Cell array of 3-sigma bounds to plot
+        %   .y          {n, 1}      Cell array of state errors to plot
+        %   .sigma3s    {n, 1}      Cell array of 3-sigma bounds to plot
         %   .x          (:, 1)      Timesteps to plot
 
         figure("Name", figData.figName);
 
         tl = tiledlayout(figData.tlDim(1), figData.tlDim(2));
         tl.Title.String = "MEKF State Errors";
-        colororder(lines(3))
+
+        plotColours = lines(3);
+        if figData.plotType == "overview"
+            colororder(plotColours)
+        elseif figData.plotType == "detailed"
+            colororder([plotColours(1:2, :); plotColours(2, :)])
+        end
+
         set(0, 'DefaultLineLineWidth', 1.4)
 
         nPlots = size(figData.plotSizes, 1);
@@ -258,24 +264,26 @@ methods(Static)
             plot(figData.x, figData.sigma3s{i}, ':')
             plot(figData.x, -figData.sigma3s{i}, ':')
             hold off
-            ylim(yBounds(figData.sigma3s{i}, figData.y{i}));
+            ylim(yBounds(figData.sigma3s{i}));
 
             if (i == 1)
-                lg = legend('x', 'y', 'z', '3-\sigma_x', '3-\sigma_y', '3-\sigma_z');
+                if figData.plotType == "overview"
+                    lg = legend('x', 'y', 'z', '3-\sigma_x', '3-\sigma_y', '3-\sigma_z');
+                elseif figData.plotType == "detailed"
+                    lg = legend('State Error', '3-\sigma');
+                end
                 lg.Location = "eastoutside";
             end
         end
 
-        function bound = yBounds(sigVals, xVals)
+        function bound = yBounds(sigVals)
             % sets smart y limits
             
-            % get the timestep with smallest sigma-3 bound
+            % get sig3 values
             valid = any(sigVals ~= 0, 1);
-            [~, minI] = min(sum(sigVals(:, valid)));
-
-            % get max of [sigma-3; x] at this timestep
-            % set y limits to 3 times this value
-            y = 3*(max([sigVals(:, minI); xVals(:, minI)]));
+            sample = sigVals(:, valid);
+            
+            y = 1.5 * prctile(sample, 95, 'all');
 
             if isempty(y) || y == 0
                 y = 1;

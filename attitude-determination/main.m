@@ -25,11 +25,11 @@ jDData = jsondecode(readlines('../results/jd.json', 'EmptyLineRule', 'skip'));
 eclipseData = jsondecode(readlines('../results/eclipse.json', 'EmptyLineRule', 'skip'));
 
 % simulation timeframe and timestep
+nSim = length(jDData);
 t0 = 0;
 tf = (jDData(end)-jDData(1))*86400;
-dt = tf/(length(jDData)-1);
+dt = tf/(nSim-1);
 t = t0:dt:tf;
-nSim = length(t);
 
 PLOT_SENSOR_MEASUREMENTS = true;
 
@@ -389,8 +389,8 @@ xline(out.initialisationTime./60, 'r--', 'LineWidth', 1.5)
 hold off
 PlotEclipsePatch(eclipseData, t)
 
-
-mekfCal.Plot(t, out.xErrList, out.xSigma3List)
+mekfCal.Plot(t, out.xErrList, out.xSigma3List, 'overview')
+mekfCal.Plot(t, out.xErrList, out.xSigma3List, 'detailed')
 
 tPlot = toc;
 fprintf("Plotting completed in %f s\n", tPlot)
