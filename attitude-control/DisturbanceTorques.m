@@ -44,24 +44,27 @@ function [T, surfData] = DisturbanceTorques(x, d, env, geom, shadowing)
 %       .t  (3, n)      Surface torque (N m)
 
 dcm = QToDCM(x(d.iQ));
+rECI = x(d.iR)*1e3; % m
+vECI = x(d.iV)*1e3; % m/s
 
 %% gravity gradient
 mu = 3.986e14; % m^3 s^-2
 
-rb = dcm*x(d.iR); % km
-rb = rb*1e3; % switch to m (delete once we update state vector to use m)
+rB = dcm*rECI;
 
-T.g = 3*mu/norm(rb)^5 * cross(rb, d.ISat*rb);
+T.g = 3*mu/norm(rB)^5 * cross(rB, d.ISat*rB);
 
 %% aero drag + SRP
-% TODO: remove conversion to m
-% TODO: add relative vel to atmosphere
-v = x(d.iV)*1e3;
+
+% get relative velocity to atmosphere (assume atmosphere rotates with
+% earth)
+wEarthECI = 7.2921158553e-5*[0; 0; 1];
+vRelECI = vECI - cross(wEarthECI, rECI);
 
 % convert velocity to body frame
-v = dcm*v;
-vMag = norm(v);
-vHat = v ./ vMag;
+vRelB = dcm*vRelECI;
+vMag = norm(vRelB);
+vHat = vRelB ./ vMag;
 
 % convert sun vec to body frame
 s = dcm*env.s;
