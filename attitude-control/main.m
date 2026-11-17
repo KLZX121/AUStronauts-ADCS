@@ -29,7 +29,7 @@ USE_SUBDIVIDED_GEOMETRY = true;
 q0 = GetLVLHQ(r0, v0);
 
 % angular velocities
-wSat0 = [0; 0; 0;]; % (rad/s)
+wSat0 = [0.0593; -0.1640; -0.0057;]; % (rad/s)
 wRW0 = [0; 0; 0;];  % (rad/s)
 
 
@@ -91,7 +91,7 @@ xDotFn = @(x, d) [
 %% propagate with integrator (RK4)
 h = 1;
 t0 = 0;
-tf = 90*60;
+tf = 150*60;
 
 t = t0:h:tf;
 nSim = length(t);
@@ -104,6 +104,7 @@ results.qLVLH(:, 1) = GetLVLHQ(r0, v0);
 results.x = zeros(nStates, nSim);
 results.x(:, 1) = x0;
 results.TC = zeros(3, nSim);
+results.TDetumble = zeros(3, nSim); %new
 results.dist(1:nSim) = struct( ...
     'g', zeros(3, 1), ...
     'a', zeros(3, 1), ...
@@ -147,14 +148,15 @@ for i = 2:nSim
     % compute control torque
     if i == 2 || mod(i*h,d.controlHZ) == 0
         TC = ControlTorque(qLVLH, x, d);
-        %d.TRW = -TC;
+        %d.TRW = -TC; no reaction wheel torque
     end
 
 
 
     % compute disturbances
     [distT, distSurf] = DisturbanceTorques(x, d, env, geometry, DO_SHADOWING);
-    d.TExt = distT.g + distT.a + distT.s + distT.m;
+    TDetumble = DetumbleTorque(x, d, jD);
+    d.TExt = distT.g + distT.a + distT.s + distT.m + TDetumble;
 
 
     x = PropState(xDotFn, x, d, h);
@@ -172,6 +174,7 @@ for i = 2:nSim
     results.s(:, i) = env.s;
     results.rs(i) = rs;
     results.inEclipse(i) = env.inEclipse;
+    results.TDetumble(:, i) = TDetumble; %new
 end
 tSim = toc(t0Sim);
 fprintf("Simulation completed in %f s\n", tSim)
@@ -255,12 +258,25 @@ ylim('padded')
 
 PlotEclipsePatch(results.inEclipse, t)
 
+%{
 nexttile
 plot(t, results.TC)
 title('Command Torques')
 legend('T_x', 'T_y', 'T_z')
 grid on
 ylabel('T_r_w (N/m)')
+ylim('padded')
+
+PlotEclipsePatch(results.inEclipse, t)
+%}
+
+%new
+nexttile
+plot(t, results.TDetumble)
+title('Detumble Torques')
+legend('T_x', 'T_y', 'T_z')
+grid on
+ylabel('T_d_t (N/m)')
 ylim('padded')
 
 PlotEclipsePatch(results.inEclipse, t)
