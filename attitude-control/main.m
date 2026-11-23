@@ -19,22 +19,48 @@ if isempty(which('IGRFECI'))
     addpath(genpath('../environment'));
 end
 
-DO_SHADOWING = true;
-USE_SUBDIVIDED_GEOMETRY = true;
+%% settings
+
+DO_SHADOWING = false; % sets whether disturbances should calc shadowing
+USE_SUBDIVIDED_GEOMETRY = false; % sets whether subdivided panel geom should be used
+
+ORBIT_TYPE = "iss"; % 'iss' or 'sso'
+TUMBLING = false; % sets whether a tumbling initial angular velocity should be used
 
 %% initial states
 
-% orbital elements to find initial pos and vel
-[el, jD0] = ISSOrbit('high');
-[r0, v0] = El2RV(el); % [km, km/s]
+jD0 = 2456480.60789551; % initial jD from SCT's 'high' ISSOrbit - 7/7/2013
+if ORBIT_TYPE == "iss"
+    r0 = [
+        -2131.94601248051;
+        3807.57900798139;
+        5190.6937265168
+    ]; % km
+    v0 = [
+        -7.21344813897916
+        -2.26492915273798
+        -1.3040741748488
+    ]; % km/s
+elseif ORBIT_TYPE == "sso"
+    r0 = [6871; 0; 0]; % km
+    v0 = [0; -1060.02039; 7542.43696].*1e-3; % km/s
+end
 
 % attitude quaternion
 q0 = GetLVLHQ(r0, v0);
 
 % angular velocities
-wSat0 = [0.0593; -0.1640; -0.0057;]; % (rad/s)
-wRW0 = [0; 0; 0;];  % (rad/s)
-
+if TUMBLING
+    % magnitude ~ 8.8 deg/s
+    wSat0 = deg2rad([
+        5;
+        4;
+        -6;
+    ]); % (rad/s)
+else
+    wSat0 = [0; 0; 0;];  % (rad/s)
+end
+wRW0 = [0; 0; 0;]; % (rad/s)
 
 % state vector
 x0 = [
@@ -47,11 +73,15 @@ x0 = [
 
 nStates = 16;
 
-
-% data struct
+%% data struct
 % TODO: define in separate file?
+
 % satellite moi
-d.ISat = InertiaCubeSat('3U', 6);
+d.ISat = [
+    0.05 0 0;
+    0 0.05 0;
+    0 0 0.01;
+];
 
 % external torques
 d.TExt = [0 0 0]';
@@ -73,6 +103,9 @@ d.iQ = 7:10;
 d.iWSat = 11:13;
 d.iWRW = 14:16;
 
+% gravitational parameter
+d.mu = 3.986e14; % m^3 s^-2
+
 % satellite geometry
 if USE_SUBDIVIDED_GEOMETRY
     geometry = jsondecode(fileread('../subgeometry.json'));
@@ -85,7 +118,7 @@ end
 % ode state vector functions
 % TODO: replace orbit propagator (FOrbCart) with mission team values
 xDotFn = @(x, d) [
-    FOrbCart(x);
+    OrbitalDynamics(x, d);
     QKinematics(x, d); 
     EulerDynamics(x, d);
     RWDynamics(EulerDynamics(x, d), d);
@@ -146,7 +179,6 @@ for i = 2:nSim
     qLVLH = GetLVLHQ(x(d.iR), x(d.iV));
 
 
-
     % compute control torque
     if i == 2 || mod(i*h,d.controlHZ) == 0
         %TC = ControlTorque(qLVLH, x, d);
@@ -154,19 +186,16 @@ for i = 2:nSim
     end
 
 
-
     % compute disturbances
     [distT, distSurf] = DisturbanceTorques(x, d, env, geometry, DO_SHADOWING);
     TDetumble = DetumbleTorque(x, d, jD);
     d.TExt = distT.g + distT.a + distT.s + distT.m + TDetumble;
 
-
+    % propagate state
     x = PropState(xDotFn, x, d, h);
-
-    % renormalise quaternion
     x(d.iQ) = x(d.iQ) ./ norm(x(d.iQ));
 
-
+    % save results
     results.jD(i) = jD;
     results.x(:, i) = x;
     results.TC(:, i) = d.TRW;

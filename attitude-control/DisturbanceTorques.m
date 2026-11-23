@@ -13,6 +13,7 @@ function [T, surfData] = DisturbanceTorques(x, d, env, geom, shadowing)
 %   .iV         (1, 3)      Index of orbital velocity (km/s)
 %   .iQ         (1, 4)      Index of attitude quaternion
 %   .ISat       (3, 3)      Satellite MOI tensor (kg m^2)
+%   .mu         (1, 1)      Standard gravitational parameter (m^3/s^2)
 %   env         (struct)    Environmental data struct
 %   .rho        (1, 1)      Atmospheric density (kg m^-3)
 %   .p          (1, 1)      Total Solar Radiation Pressure (N/m^2)
@@ -48,11 +49,9 @@ rECI = x(d.iR)*1e3; % m
 vECI = x(d.iV)*1e3; % m/s
 
 %% gravity gradient
-mu = 3.986e14; % m^3 s^-2
-
 rB = dcm*rECI;
 
-T.g = 3*mu/norm(rB)^5 * cross(rB, d.ISat*rB);
+T.g = 3*d.mu/norm(rB)^5 * cross(rB, d.ISat*rB);
 
 %% aero drag + SRP
 
