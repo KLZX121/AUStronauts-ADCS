@@ -248,7 +248,10 @@ tl.Title.FontWeight = 'bold';
 
 nexttile
 plot(t, results.x(d.iR, :))
-legend('r_x', 'r_y', 'r_z')
+hold on
+plot(t, vecnorm(results.x(d.iR, :), 2, 1), 'k--')
+hold off
+legend('r_x', 'r_y', 'r_z', '|r|')
 grid on
 ylabel('r (km)')
 ylim('padded')
@@ -256,7 +259,10 @@ PlotEclipsePatch(results.inEclipse, t)
 
 nexttile
 plot(t, results.x(d.iV, :))
-legend('v_x', 'v_y', 'v_z')
+hold on
+plot(t, vecnorm(results.x(d.iV, :), 2, 1), 'k--')
+hold off
+legend('v_x', 'v_y', 'v_z', '|v|')
 grid on
 ylabel('v (km/s)')
 ylim('padded')
@@ -271,18 +277,24 @@ ylim('padded')
 PlotEclipsePatch(results.inEclipse, t)
 
 nexttile([2 1])
-plot(t, results.x(d.iWSat, :))
-legend('\omega_x', '\omega_y', '\omega_z')
+plot(t, rad2deg(results.x(d.iWSat, :)))
+hold on
+plot(t, rad2deg(vecnorm(results.x(d.iWSat, :), 2, 1)), 'k--')
+hold off
+legend('\omega_x', '\omega_y', '\omega_z', '|\omega|')
 grid on
-ylabel('\omega_s_a_t (rad/s)')
+ylabel('\omega_s_a_t (deg/s)')
 ylim('padded')
 PlotEclipsePatch(results.inEclipse, t)
 
 nexttile
-plot(t, results.x(d.iWRW, :))
-legend('\omega_x', '\omega_y', '\omega_z')
+plot(t, rad2deg(results.x(d.iWRW, :)))
+hold on
+plot(t, rad2deg(vecnorm(results.x(d.iWRW, :), 2, 1)), 'k--')
+hold off
+legend('\omega_x', '\omega_y', '\omega_z', '|\omega|')
 grid on
-ylabel('\omega_r_w (rad/s)')
+ylabel('\omega_r_w (deg/s)')
 ylim('padded')
 PlotEclipsePatch(results.inEclipse, t)
 
@@ -310,7 +322,7 @@ tiledlayout(3, 1)
 nexttile
 plot(t, results.TC)
 hold on
-plot(t, vecnorm(results.TC, 2, 1), '--')
+plot(t, vecnorm(results.TC, 2, 1), 'k--')
 hold off
 title('Reaction Wheel Torque')
 ylabel('T (N m)')
@@ -320,7 +332,7 @@ grid on
 nexttile
 plot(t, results.m)
 hold on
-plot(t, vecnorm(results.m, 2, 1), '--')
+plot(t, vecnorm(results.m, 2, 1), 'k--')
 hold off
 title('Magnetorquer Dipole Moment')
 ylabel('m (A m^2)')
@@ -330,7 +342,7 @@ grid on
 nexttile
 plot(t, results.TMTQ)
 hold on
-plot(t, vecnorm(results.TMTQ, 2, 1), '--')
+plot(t, vecnorm(results.TMTQ, 2, 1), 'k--')
 hold off
 title('Magnetorquer Torque')
 ylabel('T (N m)')
