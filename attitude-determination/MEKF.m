@@ -36,6 +36,21 @@ properties
     h (:, 1) double
     H (:, :) double
     K (:, :) double
+
+    % sun measurement configuration
+    %   "scalar" - raw per-sensor CSS outputs (non-invariant)
+    %   "vector" - unit sun vector built by CSSModel.CalcSunVec (invariant)
+    sunMode (1, 1) string {mustBeMember(sunMode, ["scalar", "vector"])} = "scalar"
+    sigmaSun (1, 1) double = 0.1    % rad, 1-sigma sun vector error (vector mode)
+    minSunSensors (1, 1) double = 3 % min lit sensors for a valid sun vector
+    nVecMeas (1, 1) double = 1      % number of 3-vector blocks at top of y
+
+    % covariance update form
+    %   false - short form P = (I - KH)P
+    %   true  - Joseph form, symmetrised
+    useJoseph (1, 1) logical = false
+    % whether the filter's internal sensor simulation adds noise
+    genNoise (1, 1) logical = true
 end
 
 methods(Abstract, Access=protected)
@@ -93,13 +108,29 @@ methods
     
         % measurement update
         % covariance update
-        o.P = (eye(o.nStates)-o.K*o.H)*o.P;
+        o.P = o.CovUpdate();
         % state update
         o.xEst(1:3) = zeros(3, 1);
         o.xEst = o.xEst + o.K*(o.y - o.h);
         % quaternion update
         o.qEst = o.qEst + QKinematics([o.qEst; o.xEst(1:3)], struct('iQ', 1:4, 'iWSat', 5:7));
         o.qEst = o.qEst./norm(o.qEst);
+    end
+
+    function P = CovUpdate(o)
+        %CovUpdate Measurement update of the covariance
+        %   P = CovUpdate(o)
+        %
+        %   Uses o.K, o.H, o.R and o.P (prior). Short form unless
+        %   o.useJoseph is true.
+
+        IKH = eye(o.nStates) - o.K*o.H;
+        if o.useJoseph
+            P = IKH*o.P*IKH' + o.K*o.R*o.K';
+            P = (P + P')/2;
+        else
+            P = IKH*o.P;
+        end
     end
 
     function o = Propagate(o, dt, wGyro)
@@ -141,21 +172,50 @@ methods
         %   H           (:, :)      Measurement sensitivity matrix
         %   R           (:, :)      Measurement covariance matrix
 
-        yMag = o.mag.Measurement(q, env.bRef, true);
+        yMag = o.mag.Measurement(q, env.bRef, o.genNoise);
         [hMag, HMag] = o.mag.MEKFMatrices(o.qEst, env.bRef, o.nStates);
 
-        yCSS = o.css.Measurement(q, env, true);
-        % filter in-fov sensors
-        inFOV = find(yCSS >= o.css.yFov);
-        yCSS = yCSS(inFOV);
+        if o.sunMode == "scalar"
+            % raw CSS outputs, in-FOV sensors only
+            yCSS = o.css.Measurement(q, env, o.genNoise);
+            inFOV = find(yCSS >= o.css.yFov);
+            yCSS = yCSS(inFOV);
 
-        [hCSS, HCSS] = o.css.MEKFMatrices(o.qEst, env, o.nStates, inFOV);
+            [hCSS, HCSS] = o.css.MEKFMatrices(o.qEst, env, o.nStates, inFOV);
 
-        y = [yMag; yCSS;];
-        h = [hMag; hCSS;];
-        H = [HMag; HCSS;];
+            y = [yMag; yCSS;];
+            h = [hMag; hCSS;];
+            H = [HMag; HCSS;];
 
-        R = blkdiag((o.mag.sigma^2).*eye(3), (o.css.sigmaYFov^2).*eye(length(inFOV)));
+            R = blkdiag((o.mag.sigma^2).*eye(3), (o.css.sigmaYFov^2).*eye(length(inFOV)));
+            o.nVecMeas = 1;
+        else
+            % unit sun vector constructed from the CSS array
+            [ySun, yLit] = o.css.Measurement(q, env, o.genNoise);
+            sunValid = ~env.inEclipse && sum(yLit > 0) >= o.minSunSensors;
+
+            if sunValid
+                uSMeas = o.css.CalcSunVec(ySun, env.T);
+                sunValid = all(isfinite(uSMeas));
+            end
+
+            if sunValid
+                uSEst = QToDCM(o.qEst)*env.uSRef;
+
+                y = [yMag; uSMeas];
+                h = [hMag; uSEst];
+                H = [HMag; Skew(uSEst), zeros(3, o.nStates-3)];
+
+                R = blkdiag((o.mag.sigma^2).*eye(3), (o.sigmaSun^2).*eye(3));
+                o.nVecMeas = 2;
+            else
+                y = yMag;
+                h = hMag;
+                H = HMag;
+                R = (o.mag.sigma^2).*eye(3);
+                o.nVecMeas = 1;
+            end
+        end
     end
 
     function xErr = CalcError(o, qTrue, xiTrue)
@@ -241,7 +301,7 @@ methods(Static)
         figure("Name", figData.figName);
 
         tl = tiledlayout(figData.tlDim(1), figData.tlDim(2));
-        tl.Title.String = "MEKF State Errors";
+        tl.Title.String = figData.figName;
 
         plotColours = lines(3);
         if figData.plotType == "overview"

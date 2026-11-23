@@ -46,14 +46,14 @@ methods(Access=protected)
 
     function [F, G] = StateMatrices(o)
         % paper eq. 27
-        A = RIEKF.DCM(o.qEst);
-        wI = A'*o.wEst;     % inertial angular velocity estimate
+        AEst = RIEKF.DCM(o.qEst);
+        wI = AEst'*o.wEst;     % inertial angular velocity estimate
 
         F = [
             zeros(3), -eye(3);
             zeros(3), Skew(wI);
         ];
-        G = blkdiag(A', -A');
+        G = blkdiag(AEst', -AEst');
     end
 end
 methods
@@ -70,10 +70,10 @@ methods
         o.K = o.P*o.H' / (o.H*o.P*o.H' + o.R);
 
         % covariance update
-        o.P = (eye(o.nStates) - o.K*o.H)*o.P;
+        o.P = o.CovUpdate();
 
         % correction in the inertial frame
-        c = o.K*(o.y - o.h);
+        c = o.K*(o.h - o.y);
         cq = c(1:3);
         cb = c(4:6);
 
@@ -89,24 +89,21 @@ methods
     function [y, h, H, R] = MeasurementMatrices(o, q, env)
         %MeasurementMatrices Measurements with H for the inertial error
         %   [y, h, H, R] = MeasurementMatrices(o, q, env)
-        %
-        %   y, h, R are identical to MEKF.MeasurementMatrices (body-frame
-        %   residual y - h). H is re-expressed so that
-        %       y - h = H*[gammaI; betaI]
-        %   using the MEKF relation y - h = H_B*[dtheta_B; dbeta] with
-        %       dtheta_B = -A*gammaI,  dbeta = -A*betaI
-        %   i.e. H = -H_B*blkdiag(A, A).
-        %
-        %   For vector sensors this is equivalent to the paper's inertial
-        %   output error E = r - A'(q)*y with H = [r x, 0] (eq. 29-31):
-        %   rotating the residual by -A' leaves K*(residual) unchanged.
-        %   Working in the body frame lets the scalar CSS measurements be
-        %   used as well.
-
+     
         [y, h, H, R] = MeasurementMatrices@MEKF(o, q, env);
 
-        A = RIEKF.DCM(o.qEst);
-        H = -H*blkdiag(A, A);
+        AEst = RIEKF.DCM(o.qEst);
+        T = blkdiag(-AEst', -AEst');
+
+        % rotate every 3-vector measurement block (mag, and sun vector in
+        % "vector" mode) to the inertial frame; scalar CSS rows are left
+        % untouched since they have no frame to rotate
+        nV = o.nVecMeas;
+        Gamma = blkdiag(kron(eye(nV), AEst'), eye(length(y)-3*nV));
+
+        y = Gamma*y;
+        h = Gamma*h;
+        H = -Gamma*H*T';
     end
 
     function xErr = CalcError(o, qTrue, xiTrue)

@@ -86,6 +86,9 @@ gyro = GyroModel(calG);
 
 % mekf
 riekf = RIEKF;
+%riekf.sunMode = "vector";    % "scalar" (per-sensor CSS) or "vector" (unit sun vector)
+%riekf.sigmaSun = 0.1;        % rad, 1-sigma sun vector error (vector mode)
+%riekf.minSunSensors = 3;     % min in-FOV sensors for a valid sun vector
 wPrev = xData(d.iWSat, 1);
 
 % results

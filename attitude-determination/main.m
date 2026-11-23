@@ -27,6 +27,13 @@ xData = jsondecode(readlines('../results/xdata.json', 'EmptyLineRule','skip'))';
 jDData = jsondecode(readlines('../results/jd.json', 'EmptyLineRule', 'skip'));
 eclipseData = jsondecode(readlines('../results/eclipse.json', 'EmptyLineRule', 'skip'));
 
+SIM_LENGTH = 0;
+if SIM_LENGTH > 0
+    xData = xData(:, 1:SIM_LENGTH);
+    jDData = jDData(1:SIM_LENGTH);
+    eclipseData = eclipseData(1:SIM_LENGTH);
+end
+
 % simulation timeframe and timestep
 nSim = length(jDData);
 t0 = 0;
@@ -34,7 +41,7 @@ tf = (jDData(end)-jDData(1))*86400;
 dt = tf/(nSim-1);
 t = t0:dt:tf;
 
-PLOT_SENSOR_MEASUREMENTS = true;
+PLOT_SENSOR_MEASUREMENTS = false;
 
 d.iR = 1:3;
 d.iV = 4:6;
@@ -105,6 +112,8 @@ out.xSigma3List = zeros(mekfCal.nStates, nSim);
 
 out.initialisationTime = 0;
 
+justInitialised = false;
+
 tic
 for i = 1:nSim
     %%% update state
@@ -163,10 +172,11 @@ for i = 1:nSim
         % deg apart
         sinMin = 0.5;
         sinBS  = norm(cross(uBMag, uSMeas));
-        if sinBS > sinMin %&& sum(yLit == 1) == 3
+        if sinBS > sinMin && t(i) > 600%&& sum(yLit == 1) == 3
             out.initialisationTime = t(i);
             fprintf('MEKF initialised at %.2f min (B-sun angle %.1f deg)\n', ...
                     out.initialisationTime./60, asind(sinBS))
+            justInitialised = true;
 
             x0C = zeros(15, 1);
             P0C = blkdiag( ...
@@ -193,6 +203,10 @@ for i = 1:nSim
 
     %%% Attitude error
     [thetaErr, qErr] = QAttErr(q, qEst);
+    if justInitialised
+        fprintf('TRIAD angular error was: %f deg\n', rad2deg(thetaErr))
+        justInitialised = false;
+    end
 
 
     %%% save
