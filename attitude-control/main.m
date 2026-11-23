@@ -94,7 +94,7 @@ xDotFn = @(x, d) [
 %% propagate with integrator (RK4)
 h = 1;
 t0 = 0;
-tf = 90*60;
+tf = 180*60;
 
 t = t0:h:tf;
 nSim = length(t);
@@ -148,7 +148,7 @@ for i = 2:nSim
 
     % compute control torque
     if i == 2 || mod(i*h,d.controlHZ) == 0
-        TC = ControlTorque(qLVLH, x, d);
+        %TC = ControlTorque(qLVLH, x, d);
         %d.TRW = -TC;
     end
 
@@ -262,7 +262,7 @@ plot(t, results.TC)
 title('Command Torques')
 legend('T_x', 'T_y', 'T_z')
 grid on
-ylabel('T_r_w (N/m)')
+ylabel('T_r_w (N m)')
 ylim('padded')
 
 PlotEclipsePatch(results.inEclipse, t)

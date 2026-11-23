@@ -123,6 +123,11 @@ T.s = sum(surfData.s.t, 2);
 
 %% magnetic
 
-T.m = [0; 0; 0];
+% src: https://www.sciencedirect.com/science/article/pii/S0273117723005227#s0005
+m = 0.01; % A m^2
+vec = [1; 1; 1];
+M = m*vec/norm(vec);
+
+T.m = cross(M, dcm*env.B);
 
 end
