@@ -15,6 +15,9 @@ end
 if isempty(which('PropState'))
     addpath(genpath('../common'));
 end
+if isempty(which('IGRFECI'))
+    addpath(genpath('../environment'));
+end
 
 DO_SHADOWING = true;
 USE_SUBDIVIDED_GEOMETRY = true;
@@ -91,7 +94,7 @@ xDotFn = @(x, d) [
 %% propagate with integrator (RK4)
 h = 1;
 t0 = 0;
-tf = 150*60;
+tf = 180*60;
 
 t = t0:h:tf;
 nSim = length(t);
@@ -130,11 +133,10 @@ for i = 2:nSim
     jD = jD0 + t(i)/86400;
 
     % environmental data
-    % TODO: get environmental densities
     % TODO: get srp
     [env.s, rs] = SunV1(jD, x(d.iR));
-    env.B = BDipole(x(d.iR), jD);
-    env.rho = 3.8e-12; % kg m^-3
+    env.B = IGRFECI(x(d.iR), jD);
+    env.rho = AtmosphericDensity(x(d.iR), jD); % kg m^-3
     env.p = 4.5e-6; % N m^-2
 
     % determine if in eclipse
@@ -147,8 +149,8 @@ for i = 2:nSim
 
     % compute control torque
     if i == 2 || mod(i*h,d.controlHZ) == 0
-        TC = ControlTorque(qLVLH, x, d);
-        %d.TRW = -TC; no reaction wheel torque
+        %TC = ControlTorque(qLVLH, x, d);
+        %d.TRW = -TC;
     end
 
 
@@ -264,7 +266,7 @@ plot(t, results.TC)
 title('Command Torques')
 legend('T_x', 'T_y', 'T_z')
 grid on
-ylabel('T_r_w (N/m)')
+ylabel('T_r_w (N m)')
 ylim('padded')
 
 PlotEclipsePatch(results.inEclipse, t)
