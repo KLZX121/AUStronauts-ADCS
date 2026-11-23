@@ -25,7 +25,7 @@ DO_SHADOWING = false; % sets whether disturbances should calc shadowing
 USE_SUBDIVIDED_GEOMETRY = false; % sets whether subdivided panel geom should be used
 
 ORBIT_TYPE = "iss"; % 'iss' or 'sso'
-TUMBLING = false; % sets whether a tumbling initial angular velocity should be used
+TUMBLING = true; % sets whether a tumbling initial angular velocity should be used
 
 %% initial states
 
@@ -140,7 +140,8 @@ results.qLVLH(:, 1) = GetLVLHQ(r0, v0);
 results.x = zeros(nStates, nSim);
 results.x(:, 1) = x0;
 results.TC = zeros(3, nSim);
-results.TDetumble = zeros(3, nSim); %new
+results.TMTQ = zeros(3, nSim);
+results.m = zeros(3, nSim);
 results.dist(1:nSim) = struct( ...
     'g', zeros(3, 1), ...
     'a', zeros(3, 1), ...
@@ -178,18 +179,18 @@ for i = 2:nSim
     % lvlh
     qLVLH = GetLVLHQ(x(d.iR), x(d.iV));
 
-
     % compute control torque
     if i == 2 || mod(i*h,d.controlHZ) == 0
         %TC = ControlTorque(qLVLH, x, d);
         %d.TRW = -TC;
     end
 
+    [TMTQ, m] = DetumbleTorque(x, d, env);
+    d.TExt = TMTQ;
 
     % compute disturbances
     [distT, distSurf] = DisturbanceTorques(x, d, env, geometry, DO_SHADOWING);
-    TDetumble = DetumbleTorque(x, d, jD);
-    d.TExt = distT.g + distT.a + distT.s + distT.m + TDetumble;
+    d.TExt = d.TExt + distT.g + distT.a + distT.s + distT.m;
 
     % propagate state
     x = PropState(xDotFn, x, d, h);
@@ -205,7 +206,8 @@ for i = 2:nSim
     results.s(:, i) = env.s;
     results.rs(i) = rs;
     results.inEclipse(i) = env.inEclipse;
-    results.TDetumble(:, i) = TDetumble; %new
+    results.TMTQ(:, i) = TMTQ;
+    results.m(:, i) = m;
 end
 tSim = toc(t0Sim);
 fprintf("Simulation completed in %f s\n", tSim)
@@ -233,13 +235,13 @@ writelines(jsonencode(geometry), '../results/geometry.json')
 writelines(jsonencode(results.jD), '../results/jd.json')
 writelines(jsonencode(results.inEclipse), '../results/eclipse.json')
 
-%% plot
+%% overview
 
-% convert time to minutes
+% convert time to minutes for plotting
 t = t./60;
 
 
-figure('Name', 'State Variables');
+figure('Name', 'Simulation Overview');
 tl = tiledlayout(4, 2);
 tl.Title.String = 'State Variables (ECI)';
 tl.Title.FontWeight = 'bold';
@@ -250,7 +252,6 @@ legend('r_x', 'r_y', 'r_z')
 grid on
 ylabel('r (km)')
 ylim('padded')
-
 PlotEclipsePatch(results.inEclipse, t)
 
 nexttile
@@ -259,7 +260,6 @@ legend('v_x', 'v_y', 'v_z')
 grid on
 ylabel('v (km/s)')
 ylim('padded')
-
 PlotEclipsePatch(results.inEclipse, t)
 
 nexttile([2 1])
@@ -268,7 +268,6 @@ legend('q_s', 'q_x', 'q_y', 'q_z')
 grid on
 ylabel('q')
 ylim('padded')
-
 PlotEclipsePatch(results.inEclipse, t)
 
 nexttile([2 1])
@@ -277,7 +276,6 @@ legend('\omega_x', '\omega_y', '\omega_z')
 grid on
 ylabel('\omega_s_a_t (rad/s)')
 ylim('padded')
-
 PlotEclipsePatch(results.inEclipse, t)
 
 nexttile
@@ -286,33 +284,58 @@ legend('\omega_x', '\omega_y', '\omega_z')
 grid on
 ylabel('\omega_r_w (rad/s)')
 ylim('padded')
-
 PlotEclipsePatch(results.inEclipse, t)
 
-%{
 nexttile
-plot(t, results.TC)
-title('Command Torques')
-legend('T_x', 'T_y', 'T_z')
+% note - displays rw torque in rw frame (negative body frame)
+%       displays mtq torque in body frame
+plot(t, vecnorm(results.TMTQ, 2, 1), 'DisplayName', 'MTQ')
+hold on
+plot(t, vecnorm(results.TC, 2, 1), 'DisplayName', 'RW')
+hold off
+title('Control Torque Overview')
+legend()
 grid on
-ylabel('T_r_w (N m)')
+ylabel('T (N m)')
 ylim('padded')
-
-PlotEclipsePatch(results.inEclipse, t)
-%}
-
-%new
-nexttile
-plot(t, results.TDetumble)
-title('Detumble Torques')
-legend('T_x', 'T_y', 'T_z')
-grid on
-ylabel('T_d_t (N/m)')
-ylim('padded')
-
 PlotEclipsePatch(results.inEclipse, t)
 
 xlabel('t (min)')
+
+%% control plots
+
+figure('Name', 'Actuators');
+tiledlayout(3, 1)
+
+nexttile
+plot(t, results.TC)
+hold on
+plot(t, vecnorm(results.TC, 2, 1), '--')
+hold off
+title('Reaction Wheel Torque')
+ylabel('T (N m)')
+legend('T_x', 'T_y', 'T_z', 'Magnitude')
+grid on
+
+nexttile
+plot(t, results.m)
+hold on
+plot(t, vecnorm(results.m, 2, 1), '--')
+hold off
+title('Magnetorquer Dipole Moment')
+ylabel('m (A m^2)')
+legend('m_x', 'm_y', 'm_z', 'Magnitude')
+grid on
+
+nexttile
+plot(t, results.TMTQ)
+hold on
+plot(t, vecnorm(results.TMTQ, 2, 1), '--')
+hold off
+title('Magnetorquer Torque')
+ylabel('T (N m)')
+legend('T_x', 'T_y', 'T_z', 'Magnitude')
+grid on
 
 %% attitude change plots
 

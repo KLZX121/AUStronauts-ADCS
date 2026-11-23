@@ -64,7 +64,8 @@ if isempty(tbl)
 end
 
 if h < min(tbl(:, 1)) || h > max(tbl(:, 1))
-    fprintf('Altitude %.1f km is outside the supported range of 0-1000 km for the atmospheric model. Consider another atmospheric model.', h);
+    fprintf(['Altitude %.1f km is outside the supported range of 0-1000 km ' ...
+        'for the atmospheric model. Consider another atmospheric model.\n'], h);
     rho = 0;
     return
 end
