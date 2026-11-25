@@ -27,6 +27,15 @@ USE_SUBDIVIDED_GEOMETRY = false; % sets whether subdivided panel geom should be 
 ORBIT_TYPE = "iss"; % 'iss' or 'sso'
 TUMBLING = true; % sets whether a tumbling initial angular velocity should be used
 
+%% mission phases
+missionSequence = {
+    "detumble", "", 0;
+    %"point", "nadir", 5400;
+    "point", "hybrid", 0;
+};
+
+ctrl = Controller(missionSequence, 0.1, 0.5, true);
+
 %% initial states
 
 jD0 = 2456480.60789551; % initial jD from SCT's 'high' ISSOrbit - 7/7/2013
@@ -51,11 +60,10 @@ q0 = GetLVLHQ(r0, v0);
 
 % angular velocities
 if TUMBLING
-    % magnitude ~ 8.8 deg/s
     wSat0 = deg2rad([
-        5;
-        4;
-        -6;
+        2;
+        3;
+        -1;
     ]); % (rad/s)
 else
     wSat0 = [0; 0; 0;];  % (rad/s)
@@ -127,7 +135,7 @@ xDotFn = @(x, d) [
 %% propagate with integrator (RK4)
 h = 1;
 t0 = 0;
-tf = 180*60;
+tf = 270*60;
 
 t = t0:h:tf;
 nSim = length(t);
@@ -179,14 +187,12 @@ for i = 2:nSim
     % lvlh
     qLVLH = GetLVLHQ(x(d.iR), x(d.iV));
 
-    % compute control torque
-    if i == 2 || mod(i*h,d.controlHZ) == 0
-        %TC = ControlTorque(qLVLH, x, d);
-        %d.TRW = -TC;
-    end
 
-    [TMTQ, m] = DetumbleTorque(x, d, env);
+    [TRW, TMTQ, actuatorInfo] = ctrl.Run(t(i), x, d, env);
+
+    d.TRW = TRW;
     d.TExt = TMTQ;
+
 
     % compute disturbances
     [distT, distSurf] = DisturbanceTorques(x, d, env, geometry, DO_SHADOWING);
@@ -207,7 +213,7 @@ for i = 2:nSim
     results.rs(i) = rs;
     results.inEclipse(i) = env.inEclipse;
     results.TMTQ(:, i) = TMTQ;
-    results.m(:, i) = m;
+    results.m(:, i) = actuatorInfo.m;
 end
 tSim = toc(t0Sim);
 fprintf("Simulation completed in %f s\n", tSim)
@@ -234,6 +240,8 @@ writelines(jsonencode((results.s .* results.rs)'), '../results/rs.json')
 writelines(jsonencode(geometry), '../results/geometry.json')
 writelines(jsonencode(results.jD), '../results/jd.json')
 writelines(jsonencode(results.inEclipse), '../results/eclipse.json')
+qdata = results.x(d.iQ, :);
+writelines(jsonencode(qdata'), '../results/q.json')
 
 %% overview
 
@@ -288,13 +296,13 @@ ylim('padded')
 PlotEclipsePatch(results.inEclipse, t)
 
 nexttile
-plot(t, rad2deg(results.x(d.iWRW, :)))
+plot(t, (results.x(d.iWRW, :)))
 hold on
-plot(t, rad2deg(vecnorm(results.x(d.iWRW, :), 2, 1)), 'k--')
+plot(t, (vecnorm(results.x(d.iWRW, :), 2, 1)), 'k--')
 hold off
 legend('\omega_x', '\omega_y', '\omega_z', '|\omega|')
 grid on
-ylabel('\omega_r_w (deg/s)')
+ylabel('\omega_r_w (rad/s)')
 ylim('padded')
 PlotEclipsePatch(results.inEclipse, t)
 
